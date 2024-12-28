@@ -10,7 +10,7 @@ from libs.balance import *
 # +TODO: /start - приветствие
 # TODO: /help - список команд
 # +TODO: /call - написать владельцу бота
-# TODO: /report - отчёт по балансу
+# +TODO: /report - отчёт по балансу
 # +TODO: /balance - текущий баланс
 # +TODO: /balance <число> - изменить баланс на число
 # TODO: /notification <дата> <время> <сообщение> - уведомление
@@ -22,7 +22,8 @@ from libs.balance import *
 # TODO: /email <сообщение> - отправить сообщение на почту
 # TODO: /email list - список сообщений на почту
 # TODO: /save - сохранить файл на веб-сервере
-# TODO: /share - поделиться файлом
+# TODO: /share <название> - поделиться файлом
+# TODO: /delete <название> - удалить файл
 # +TODO: /log - лог действий
 # TODO: /ssh <команда> - выполнить команду на сервере
 # TODO: /stats - статистика Beget
@@ -61,33 +62,75 @@ def check(id):
         bot.send_message(id, 'У вас нет прав для выполнения этой команды')
         return False
 
+import logging
+
+import logging
+
 def report():
-    # TODO: fix forecast and second plot, add more info
-    data = get_full_balance()
-    plot_balance(data)
-    plot_income_expenses(data)
-    forecast_balance, forecast_saldo = forecast_balance_and_saldo(data)
-    caption = f'Отчёт по балансу за прошлый месяц\n\nПрогнозированный баланс: {round(forecast_balance, 2)}\nПрогнозированное сальдо: {round(forecast_saldo, 2)}'
-    
-    media = []
-    media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption))
-    media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb'), caption='Доходы и расходы за прошлый месяц'))
-    
-    bot.send_media_group(USER_ID, media)
-    
-    os.remove('balance_plot.png')
-    os.remove('income_expenses_plot.png')
-    
-    current_balance, _ = get_balance()
-    update_balance(-current_balance)
-    update_current_month_balance()
+    try:
+        data = get_full_balance()
+        plot_balance(data)
+        plot_income_expenses(data)
+        forecast_balance, forecast_saldo = forecast_balance_and_saldo(data)
+
+        months = list(data['year'].keys())
+        balances = [data['year'][month].get('balance', 0) for month in months]
+        saldos = [data['year'][month].get('saldo', 0) for month in months]
+        avg_balance = sum(balances) / len(balances)
+        avg_saldo = sum(saldos) / len(saldos)
+        max_balance = max(balances)
+        min_balance = min(balances)
+        max_balance_month = months[balances.index(max_balance)]
+        min_balance_month = months[balances.index(min_balance)]
+
+        caption = (
+            f'Отчёт по балансу:\n\n'
+            f'Прогнозированный баланс: {round(forecast_balance, 2)}\n'
+            f'Прогнозированное сальдо: {round(forecast_saldo, 2)}\n\n'
+            f'Текущие доходы: {data["income"]}\n'
+            f'Текущие расходы: {data["expenses"]}\n\n'
+            f'Средний баланс за год: {round(avg_balance, 2)}\n'
+            f'Среднее сальдо за год: {round(avg_saldo, 2)}\n'
+            f'Максимальный баланс за год: {round(max_balance, 2)} ({max_balance_month})\n'
+            f'Минимальный баланс за год: {round(min_balance, 2)} ({min_balance_month})\n'
+        )
+
+        media = []
+        media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption))
+        media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
+
+        bot.send_media_group(USER_ID, media)
+
+        os.remove('balance_plot.png')
+        os.remove('income_expenses_plot.png')
+    except Exception as e:
+        bot.send_message(USER_ID, f'Произошла ошибка при отправке отчёта.')
+        logging.error(f'Error while sending report: {e}')
 
 def everyday_job():
-    day = datetime.datetime.now().strftime('%d')
-    if (day == '01'):
-        report()
-        logging.info('Monthly report was sent')
     # TODO: todo and notifications
+    try:
+        day = datetime.datetime.now().strftime('%d')
+        if day == '01':
+            data = get_full_balance()
+            current_month = datetime.datetime.now().strftime('%B')
+            previous_month = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%B')
+            previous_balance = data['year'].get(previous_month, {}).get('balance', 0)
+            
+            data['year'][current_month] = {
+                'balance': previous_balance,
+                'saldo': 0
+            }
+            data['income'] = 0
+            data['expenses'] = 0
+            
+            with open(balance_file_path, 'w') as file:
+                json.dump(data, file, indent=4)
+            
+            report()
+            logging.info('Monthly report was sent and balances were reset')
+    except Exception as e:
+        logging.error(f'Error in everyday_job: {e}')
 
 def main():
     everyday_job()
@@ -121,6 +164,7 @@ def balance(message):
         return
     message_parts = message.text.split(' ')
     if len(message_parts) == 1:
+        # TODO: update plot
         data = get_full_balance()
         plot_balance(data)
         current_balance, current_saldo = get_balance()

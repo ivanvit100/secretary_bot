@@ -48,5 +48,7 @@
             "balance": 0, 
             "saldo": 0  
         }
-    }
+    },
+    "income": 0,
+    "expenses": 0
 }
