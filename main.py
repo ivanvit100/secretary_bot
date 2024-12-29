@@ -1,14 +1,18 @@
+import subprocess
 import datetime
 import schedule
 import telebot
 import logging
+import shlex
 import time
 import os
 from dotenv import load_dotenv
+from telebot import types
 from libs.balance import *
+from libs.email import *
 
 # +TODO: /start - приветствие
-# TODO: /help - список команд
+# +TODO: /help - список команд
 # +TODO: /call - написать владельцу бота
 # +TODO: /report - отчёт по балансу
 # +TODO: /balance - текущий баланс
@@ -19,14 +23,17 @@ from libs.balance import *
 # TODO: /task <сообщение> - добавить задачу
 # TODO: /task list - список задач
 # TODO: /task delete <номер> - удалить задачу
-# TODO: /email <сообщение> - отправить сообщение на почту
+# +TODO: /email <address> <сообщение> - отправить сообщение на почту
 # TODO: /email list - список сообщений на почту
 # TODO: /save - сохранить файл на веб-сервере
 # TODO: /share <название> - поделиться файлом
 # TODO: /delete <название> - удалить файл
 # +TODO: /log - лог действий
-# TODO: /ssh <команда> - выполнить команду на сервере
+# +TODO: /ssh <команда> - выполнить команду на сервере
 # TODO: /stats - статистика Beget
+
+# TODO: restruct yaer data, add dataclasses
+# TODO: reading email
 
 #########################
 #                       #
@@ -62,51 +69,6 @@ def check(id):
         bot.send_message(id, 'У вас нет прав для выполнения этой команды')
         return False
 
-import logging
-
-import logging
-
-def report():
-    try:
-        data = get_full_balance()
-        plot_balance(data)
-        plot_income_expenses(data)
-        forecast_balance, forecast_saldo = forecast_balance_and_saldo(data)
-
-        months = list(data['year'].keys())
-        balances = [data['year'][month].get('balance', 0) for month in months]
-        saldos = [data['year'][month].get('saldo', 0) for month in months]
-        avg_balance = sum(balances) / len(balances)
-        avg_saldo = sum(saldos) / len(saldos)
-        max_balance = max(balances)
-        min_balance = min(balances)
-        max_balance_month = months[balances.index(max_balance)]
-        min_balance_month = months[balances.index(min_balance)]
-
-        caption = (
-            f'Отчёт по балансу:\n\n'
-            f'Прогнозированный баланс: {round(forecast_balance, 2)}\n'
-            f'Прогнозированное сальдо: {round(forecast_saldo, 2)}\n\n'
-            f'Текущие доходы: {data["income"]}\n'
-            f'Текущие расходы: {data["expenses"]}\n\n'
-            f'Средний баланс за год: {round(avg_balance, 2)}\n'
-            f'Среднее сальдо за год: {round(avg_saldo, 2)}\n'
-            f'Максимальный баланс за год: {round(max_balance, 2)} ({max_balance_month})\n'
-            f'Минимальный баланс за год: {round(min_balance, 2)} ({min_balance_month})\n'
-        )
-
-        media = []
-        media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption))
-        media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
-
-        bot.send_media_group(USER_ID, media)
-
-        os.remove('balance_plot.png')
-        os.remove('income_expenses_plot.png')
-    except Exception as e:
-        bot.send_message(USER_ID, f'Произошла ошибка при отправке отчёта.')
-        logging.error(f'Error while sending report: {e}')
-
 def everyday_job():
     # TODO: todo and notifications
     try:
@@ -127,7 +89,7 @@ def everyday_job():
             with open(balance_file_path, 'w') as file:
                 json.dump(data, file, indent=4)
             
-            report()
+            report(bot, USER_ID)
             logging.info('Monthly report was sent and balances were reset')
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
@@ -141,7 +103,7 @@ def main():
         try:
             bot.polling(none_stop=True, interval=0, timeout=20)
         except Exception as e:
-            print(f"Ошибка: {e}")
+            logging.error(f"Ошибка: {e}")
             time.sleep(15)
 
 #########################
@@ -151,57 +113,169 @@ def main():
 #########################
 
 @bot.message_handler(commands=['start'])
-def start(message):
+def start(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     bot.send_message(message.from_user.id, 'Приветствую! Я бот - личный секретарь. Своего босса не раскрою, но если хотите себе такого же, введите /link.\nЕсли хотите узнать, что я умею, введите /help.\nЧтобы написать моему боссу анонимное сообщение, введите /call.')
 
 @bot.message_handler(commands=['link'])
-def link(message):
+def link(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     bot.send_message(message.from_user.id, 'https://github.com/ivanvit100')
 
 @bot.message_handler(commands=['balance'])
-def balance(message):
+def balance(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
     message_parts = message.text.split(' ')
     if len(message_parts) == 1:
-        # TODO: update plot
         data = get_full_balance()
-        plot_balance(data)
+        mounth_plot(data)
         current_balance, current_saldo = get_balance()
         month = datetime.datetime.now().strftime('%B')
-        caption = f'Текущий месяц: {month}\n\nВаш баланс: {current_balance}\nСальдо: {current_saldo}'
-        with open('balance_plot.png', 'rb') as photo:
-            bot.send_photo(message.from_user.id, photo, caption=caption)
-        os.remove('balance_plot.png')
+        caption = f'Текущий месяц: {month}\n\nВаш баланс: `{current_balance}`\nСальдо: `{current_saldo}`'
+        with open('mounth_plot.png', 'rb') as photo:
+            bot.send_photo(message.from_user.id, photo, caption=caption, parse_mode='Markdown')
+        os.remove('mounth_plot.png')
     else:
         try:
             new_balance = float(message_parts[1])
             update_balance(new_balance)
-            bot.send_message(message.from_user.id, f'Баланс обновлен: {new_balance}')
+            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`')
         except ValueError:
             bot.send_message(message.from_user.id, 'Неверный формат параметра')
 
 @bot.message_handler(commands=['report'])
-def rpt(message):
+def rpt(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
-    report()
+    report(bot, USER_ID)
 
 @bot.message_handler(commands=['call'])
-def call(message):
+def call(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     message_parts = message.text.split(' ')
     if message.from_user.id != int(USER_ID) and len(message_parts) > 1:
         bot.send_message(int(USER_ID), f'Анонимное сообщение: \n\n{message.text[6:]}')
         bot.send_message(message.from_user.id, 'Сообщение отправлено')
 
 @bot.message_handler(commands=['log'])
-def log(message):
+def log(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
+    
     with open('./secretary.log', 'r') as file:
         lines = file.readlines()
         log = ''.join(lines[-25:])
     bot.send_message(message.from_user.id, log)
+
+@bot.message_handler(commands=['help'])
+def help(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+
+    bot.send_message(message.from_user.id, (
+        'Список команд:\n\n'
+        '/start - приветствие\n'
+        '/help - список команд\n'
+        '/call - написать владельцу бота\n'
+        '/report - отчёт по балансу\n'
+        '/balance - текущий баланс\n'
+        '/balance <число> - изменить баланс на число\n'
+        '/notification <дата> <время> <сообщение> - уведомление\n'
+        '/notification list - список уведомлений\n'
+        '/notification delete <номер> - удалить уведомление\n'
+        '/task <сообщение> - добавить задачу\n'
+        '/task list - список задач\n'
+        '/task delete <номер> - удалить задачу\n'
+        '/email <address> <сообщение> - отправить сообщение на почту\n'
+        '/email list - список сообщений на почту\n'
+        '/save - сохранить файл на веб-сервере\n'
+        '/share <название> - поделиться файлом\n'
+        '/delete <название> - удалить файл\n'
+        '/log - лог действий\n'
+        '/ssh <команда> - выполнить команду на сервере\n'
+        '/stats - статистика Beget'
+    ))
+
+@bot.message_handler(commands=['ssh'])
+def ssh(message: telebot.types.Message):
+    if not check(message.from_user.id):
+        return
+    try:
+        bot.send_chat_action(message.chat.id, 'typing')
+        
+        message_parts = shlex.split(message.text)
+        command = message_parts[1]
+        params = [part for part in message_parts[2:] if not part.startswith('-')]
+        flags = [part for part in message_parts[2:] if part.startswith('-')]
+
+        if 'sudo' in message_parts:
+            logging.warning(f'User {message.from_user.id} tried to use sudo')
+            bot.send_message(message.from_user.id, "Использование команды 'sudo' запрещено.")
+            return
+
+        result = subprocess.run([command] + params + flags, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if result.returncode == 0:
+            bot.send_message(message.from_user.id, f'Результат выполнения команды:\n\n```{result.stdout}```', parse_mode='Markdown')
+        else:
+            bot.send_message(message.from_user.id, f'Ошибка выполнения команды:\n\n```{result.stderr}```', parse_mode='Markdown')
+    except Exception as e:
+        bot.send_message(message.from_user.id, "Произошла ошибка")
+        logging.error(f'Error in ssh: {e}')
+
+@bot.message_handler(commands=['email'])
+def email(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    message_parts = message.text.split(' ')
+    if len(message_parts) < 2:
+        bot.send_message(message.from_user.id, 'Неверное количество параметров')
+        return
+    
+    if message_parts[1] == 'list':
+        emails = emails_list()
+        if not emails:
+            bot.send_message(message.from_user.id, 'Нет новых сообщений')
+            return
+
+        markup = types.InlineKeyboardMarkup()
+        for email in emails:
+            button_text = f"{email['From']}: {email['Subject']}"
+            callback_data = f"open_email_{emails.index(email)}"
+            markup.add(types.InlineKeyboardButton(text=button_text, callback_data=callback_data))
+
+        bot.send_message(message.from_user.id, 'Какое письмо открыть?', reply_markup=markup)
+        return
+    
+    if message_parts[1] == 'read':
+        bot.send_message(message.from_user.id, 'Список сообщений на почту')
+        return
+    
+    try:
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        template = os.path.join(current_directory, 'data', 'email.html')
+
+        send_email(message_parts[1], message_parts[2:], template)
+        
+        bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
+    except Exception as e:
+        logging.error(f'Error in email: {e}')
+        bot.send_message(message.from_user.id, 'Произошла ошибка')
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('open_email_'))
+def callback_query(call):
+    email_index = int(call.data.split('_')[-1])
+    emails = emails_list()
+    if email_index < len(emails):
+        selected_email = emails[email_index]
+        bot.send_message(call.message.chat.id, f"Отправитель: {selected_email['From']}\nТема: {selected_email['Subject']}")
+    else:
+        bot.send_message(call.message.chat.id, 'Письмо не найдено')
 
 
 

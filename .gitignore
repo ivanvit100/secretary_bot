@@ -3,3 +3,5 @@
 /data/
 /libs/__pycache__/
 secretary.log
+env_example
+.vscode/
