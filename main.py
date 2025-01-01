@@ -73,23 +73,25 @@ def everyday_job():
     # TODO: todo and notifications
     try:
         day = datetime.datetime.now().strftime('%d')
+        logging.info(f'Everyday job started. Day: {day}')
         if day == '01':
             data = get_full_balance()
             current_month = datetime.datetime.now().strftime('%B')
             previous_month = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%B')
             previous_balance = data['year'].get(previous_month, {}).get('balance', 0)
             
+            report(bot, USER_ID)
+            
             data['year'][current_month] = {
                 'balance': previous_balance,
                 'saldo': 0
             }
-            data['income'] = 0
-            data['expenses'] = 0
+            data['income'] = [0] * 31
+            data['expenses'] = [0] * 31
             
             with open(balance_file_path, 'w') as file:
                 json.dump(data, file, indent=4)
             
-            report(bot, USER_ID)
             logging.info('Monthly report was sent and balances were reset')
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
@@ -141,7 +143,7 @@ def balance(message: telebot.types.Message):
         try:
             new_balance = float(message_parts[1])
             update_balance(new_balance)
-            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`')
+            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`', parse_mode='Markdown')
         except ValueError:
             bot.send_message(message.from_user.id, 'Неверный формат параметра')
 

@@ -118,12 +118,18 @@ def report(bot: telebot, USER_ID: str):
 
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption, parse_mode='Markdown'))
-        media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
+        try:
+            media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
+        except:
+            pass
 
         bot.send_media_group(USER_ID, media)
 
         os.remove('balance_plot.png')
-        os.remove('income_expenses_plot.png')
+        try:
+            os.remove('income_expenses_plot.png')
+        except:
+            pass
     except Exception as e:
         bot.send_message(USER_ID, f'Произошла ошибка при отправке отчёта.')
         logging.error(f'Error while sending report: {e}')

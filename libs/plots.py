@@ -34,12 +34,19 @@ def plot_balance(data: dict):
 
 def plot_income_expenses(data: dict):
     try:
-        income = sum(data.get('income', []))
-        expenses = sum(data.get('expenses', []))
-        labels = ['Income', 'Expenses']
-        sizes = [income, expenses]
+        income = data.get('income', [])
+        expenses = data.get('expenses', [])
 
-        if sum(sizes) == 0:
+        if not isinstance(income, list) or not isinstance(expenses, list):
+            logging.warning("Income and expenses should be lists")
+            return
+
+        income_sum = sum(income)
+        expenses_sum = sum(expenses)
+        labels = ['Income', 'Expenses']
+        sizes = [income_sum, expenses_sum]
+
+        if income_sum == 0 and expenses_sum == 0:
             logging.warning("Both income and expenses are zero. Skipping pie chart generation.")
             return
 
