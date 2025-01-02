@@ -229,17 +229,13 @@ def ssh(message: telebot.types.Message):
         logging.error(f'Error in ssh: {e}')
 
 @bot.message_handler(commands=['email'])
-def email(message: telebot.types.Message):
+def email_command(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
     
     message_parts = message.text.split(' ')
     if len(message_parts) < 2:
-        bot.send_message(message.from_user.id, 'Неверное количество параметров')
-        return
-    
-    if message_parts[1] == 'list':
         emails = emails_list()
         if not emails:
             bot.send_message(message.from_user.id, 'Нет новых сообщений')
@@ -251,18 +247,14 @@ def email(message: telebot.types.Message):
             callback_data = f"open_email_{emails.index(email)}"
             markup.add(types.InlineKeyboardButton(text=button_text, callback_data=callback_data))
 
-        bot.send_message(message.from_user.id, 'Какое письмо открыть?', reply_markup=markup)
-        return
-    
-    if message_parts[1] == 'read':
-        bot.send_message(message.from_user.id, 'Список сообщений на почту')
+        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`\n\n Какое сообщение открыть?', reply_markup=markup, parse_mode='Markdown')
         return
     
     try:
         current_directory = os.path.dirname(os.path.abspath(__file__))
         template = os.path.join(current_directory, 'data', 'email.html')
 
-        send_email(message_parts[1], message_parts[2:], template)
+        send_email(message_parts[1], ' '.join(message_parts[2:]), template)
         
         bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
     except Exception as e:
@@ -270,14 +262,22 @@ def email(message: telebot.types.Message):
         bot.send_message(message.from_user.id, 'Произошла ошибка')
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('open_email_'))
-def callback_query(call):
-    email_index = int(call.data.split('_')[-1])
-    emails = emails_list()
-    if email_index < len(emails):
-        selected_email = emails[email_index]
-        bot.send_message(call.message.chat.id, f"Отправитель: {selected_email['From']}\nТема: {selected_email['Subject']}")
-    else:
-        bot.send_message(call.message.chat.id, 'Письмо не найдено')
+def callback_inline(call):
+    try:
+        email_index = int(call.data.split('_')[-1])
+        
+        emails = emails_list()
+        
+        if 0 <= email_index < len(emails):
+            email = emails[email_index]
+            email_text = f"From: {email['From']}\nSubject: {email['Subject']}\n\n{email['Body']}"
+            
+            bot.send_message(call.message.chat.id, email_text)
+        else:
+            bot.send_message(call.message.chat.id, 'Сообщение не найдено')
+    except Exception as e:
+        logging.error(f"Error handling callback query: {e}")
+        bot.send_message(call.message.chat.id, 'Произошла ошибка при обработке сообщения')
 
 
 
