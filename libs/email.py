@@ -70,3 +70,48 @@ def emails_list():
         logging.error(f'Error in emails_list: {e}')
     
     return emails
+
+def email_read(num: int):
+    try:
+        mail = imaplib.IMAP4_SSL('imap.beget.com')
+        mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        mail.select('inbox')
+
+        _, messages = mail.search(None, 'ALL')
+        email_ids = messages[0].split()
+
+        email_id = email_ids[num]
+
+        _, msg_data = mail.fetch(email_id, '(RFC822)')
+        for response_part in msg_data:
+            if isinstance(response_part, tuple):
+                msg = email.message_from_bytes(response_part[1])
+                subject, encoding = decode_header(msg['Subject'])[0]
+                if isinstance(subject, bytes):
+                    subject = subject.decode(encoding if encoding else 'utf-8')
+                from_ = msg.get('From')
+                body = ''
+
+                if msg.is_multipart():
+                    for part in msg.walk():
+                        part.get_content_type()
+                        content_disposition = str(part.get('Content-Disposition'))
+
+                        if 'attachment' not in content_disposition:
+                            payload = part.get_payload(decode=True)
+                            if payload:
+                                body += payload.decode(part.get_content_charset() or 'utf-8')
+                else:
+                    payload = msg.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode(msg.get_content_charset() or 'utf-8')
+
+                mail.logout()
+                return {
+                    'From': from_,
+                    'Subject': subject,
+                    'Body': body
+                }
+    except Exception as e:
+        logging.error(f'Error in email_read: {e}')
+        raise Exception('Error in email_read')

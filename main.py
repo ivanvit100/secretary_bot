@@ -7,6 +7,7 @@ import shlex
 import time
 import os
 from dotenv import load_dotenv
+from weasyprint import HTML # type: ignore
 from telebot import types
 from libs.balance import *
 from libs.email import *
@@ -24,7 +25,7 @@ from libs.email import *
 # TODO: /task list - список задач
 # TODO: /task delete <номер> - удалить задачу
 # +TODO: /email <address> <сообщение> - отправить сообщение на почту
-# TODO: /email list - список сообщений на почту
+# +TODO: /email - список сообщений на почту
 # TODO: /save - сохранить файл на веб-сервере
 # TODO: /share <название> - поделиться файлом
 # TODO: /delete <название> - удалить файл
@@ -33,7 +34,6 @@ from libs.email import *
 # TODO: /stats - статистика Beget
 
 # TODO: restruct yaer data, add dataclasses
-# TODO: reading email
 
 #########################
 #                       #
@@ -192,7 +192,7 @@ def help(message: telebot.types.Message):
         '/task list - список задач\n'
         '/task delete <номер> - удалить задачу\n'
         '/email <address> <сообщение> - отправить сообщение на почту\n'
-        '/email list - список сообщений на почту\n'
+        '/email - список сообщений на почту\n'
         '/save - сохранить файл на веб-сервере\n'
         '/share <название> - поделиться файлом\n'
         '/delete <название> - удалить файл\n'
@@ -241,13 +241,11 @@ def email_command(message: telebot.types.Message):
             bot.send_message(message.from_user.id, 'Нет новых сообщений')
             return
 
-        markup = types.InlineKeyboardMarkup()
-        for email in emails:
-            button_text = f"{email['From']}: {email['Subject']}"
-            callback_data = f"open_email_{emails.index(email)}"
-            markup.add(types.InlineKeyboardButton(text=button_text, callback_data=callback_data))
+        email_list = ""
+        for index, email in enumerate(emails):
+            email_list += f"{index + 1}. {email['From']}:\n{email['Subject']}\nПрочесть: /email\_read\_{index}\n\n"
 
-        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`\n\n Какое сообщение открыть?', reply_markup=markup, parse_mode='Markdown')
+        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`:\n\n{email_list}', parse_mode='Markdown')
         return
     
     try:
@@ -261,23 +259,28 @@ def email_command(message: telebot.types.Message):
         logging.error(f'Error in email: {e}')
         bot.send_message(message.from_user.id, 'Произошла ошибка')
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('open_email_'))
-def callback_inline(call):
+@bot.message_handler(func=lambda message: message.text.startswith('/email_read_'))
+def email_read_command(message: telebot.types.Message):
+    if not check(message.from_user.id):
+        return
+    bot.send_chat_action(message.chat.id, 'typing')
+    
     try:
-        email_index = int(call.data.split('_')[-1])
+        email_index = int(message.text.split('_')[-1])
         
-        emails = emails_list()
+        email = email_read(email_index)
+        email_html = f"<h1>{email['From']}</h1><h2>{email['Subject']}</h2><p>{email['Body']}</p>"
         
-        if 0 <= email_index < len(emails):
-            email = emails[email_index]
-            email_text = f"From: {email['From']}\nSubject: {email['Subject']}\n\n{email['Body']}"
-            
-            bot.send_message(call.message.chat.id, email_text)
-        else:
-            bot.send_message(call.message.chat.id, 'Сообщение не найдено')
+        pdf_path = f"/tmp/email_{email_index}.pdf"
+        HTML(string=email_html).write_pdf(pdf_path)
+        
+        with open(pdf_path, 'rb') as pdf_file:
+            bot.send_document(message.from_user.id, pdf_file)
+        
+        os.remove(pdf_path)
     except Exception as e:
-        logging.error(f"Error handling callback query: {e}")
-        bot.send_message(call.message.chat.id, 'Произошла ошибка при обработке сообщения')
+        logging.error(f"Error handling email_read command: {e}")
+        bot.send_message(message.from_user.id, 'Произошла ошибка при обработке сообщения')
 
 
 
