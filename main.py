@@ -192,7 +192,7 @@ def email_command(message: telebot.types.Message):
     if not check(message.from_user.id):
         return
     
-    email_main(message)
+    email_main(message, bot)
 
 @bot.message_handler(func=lambda message: message.text.startswith('/email_read_'))
 def email_read_command(message: telebot.types.Message):

@@ -79,7 +79,7 @@ def emails_list():
 
         last_10_email_ids = email_ids[-10:]
 
-        for email_id in reversed(last_10_email_ids):
+        for email_id in last_10_email_ids:
             _, msg_data = mail.fetch(email_id, '(RFC822)')
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
@@ -100,7 +100,7 @@ def emails_list():
     
     return emails
 
-def email_read(num: int):
+def email_read_body(num: int):
     try:
         mail = imaplib.IMAP4_SSL('imap.beget.com')
         mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
@@ -149,7 +149,7 @@ def email_read(message: telebot.types.Message, bot: telebot.TeleBot):
     try:
         email_index = int(message.text.split('_')[-1])
         
-        email = email_read(email_index)
+        email = email_read_body(email_index)
         email_html = f"<h1>{email['From']}</h1><h2>{email['Subject']}</h2><p>{email['Body']}</p>"
         
         pdf_path = f"/tmp/email_{email_index}.pdf"
