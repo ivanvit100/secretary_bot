@@ -5,3 +5,5 @@
 secretary.log
 env_example
 .vscode/
+/files/
+/public_files/

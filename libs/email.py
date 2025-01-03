@@ -1,11 +1,14 @@
 import smtplib
 import logging
 import imaplib
+import telebot
 import email
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
+from weasyprint import HTML # type: ignore
+from telebot import types
 import os
 
 load_dotenv()
@@ -15,7 +18,33 @@ load_dotenv()
 EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
 
-def send_email(to_address, subject, template_path):
+def email_main(message: telebot.types.Message, bot: telebot.TeleBot):
+    message_parts = message.text.split(' ')
+    if len(message_parts) < 2:
+        emails = emails_list()
+        if not emails:
+            bot.send_message(message.from_user.id, 'Нет новых сообщений')
+            return
+
+        email_list = ""
+        for index, email in enumerate(emails):
+            email_list += f"{index + 1}. {email['From']}:\n{email['Subject']}\nПрочесть: /email\_read\_{index}\n\n"
+
+        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`:\n\n{email_list}', parse_mode='Markdown')
+        return
+    
+    try:
+        current_directory = os.path.dirname(os.path.abspath(__file__))
+        template = os.path.join(current_directory, 'data', 'email.html')
+
+        send_email(message_parts[1], ' '.join(message_parts[2:]), template)
+        
+        bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
+    except Exception as e:
+        logging.error(f'Error in email: {e}')
+        bot.send_message(message.from_user.id, 'Произошла ошибка')
+
+def send_email(to_address: str, subject: str, template_path: str):
     try:
         with open(template_path, 'r', encoding='utf-8') as file:
             email_content = file.read()
@@ -50,7 +79,7 @@ def emails_list():
 
         last_10_email_ids = email_ids[-10:]
 
-        for email_id in last_10_email_ids:
+        for email_id in reversed(last_10_email_ids):
             _, msg_data = mail.fetch(email_id, '(RFC822)')
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
@@ -115,3 +144,21 @@ def email_read(num: int):
     except Exception as e:
         logging.error(f'Error in email_read: {e}')
         raise Exception('Error in email_read')
+
+def email_read(message: telebot.types.Message, bot: telebot.TeleBot):
+    try:
+        email_index = int(message.text.split('_')[-1])
+        
+        email = email_read(email_index)
+        email_html = f"<h1>{email['From']}</h1><h2>{email['Subject']}</h2><p>{email['Body']}</p>"
+        
+        pdf_path = f"/tmp/email_{email_index}.pdf"
+        HTML(string=email_html).write_pdf(pdf_path)
+        
+        with open(pdf_path, 'rb') as pdf_file:
+            bot.send_document(message.from_user.id, pdf_file)
+        
+        os.remove(pdf_path)
+    except Exception as e:
+        logging.error(f"Error handling email_read command: {e}")
+        bot.send_message(message.from_user.id, 'Произошла ошибка при обработке сообщения')

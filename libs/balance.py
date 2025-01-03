@@ -11,6 +11,25 @@ from libs.plots import *
 current_dir = os.path.dirname(os.path.abspath(__file__))
 balance_file_path = os.path.join(current_dir, '../data/balance.json')
 
+def balance_main(message: telebot.types.Message, bot: telebot.TeleBot):
+    message_parts = message.text.split(' ')
+    if len(message_parts) == 1:
+        data = get_full_balance()
+        mounth_plot(data)
+        current_balance, current_saldo = get_balance()
+        month = datetime.datetime.now().strftime('%B')
+        caption = f'Текущий месяц: {month}\n\nВаш баланс: `{current_balance}`\nСальдо: `{current_saldo}`'
+        with open('mounth_plot.png', 'rb') as photo:
+            bot.send_photo(message.from_user.id, photo, caption=caption, parse_mode='Markdown')
+        os.remove('mounth_plot.png')
+    else:
+        try:
+            new_balance = float(message_parts[1])
+            update_balance(new_balance)
+            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`', parse_mode='Markdown')
+        except ValueError:
+            bot.send_message(message.from_user.id, 'Неверный формат параметра')
+
 def get_balance(month = -1):
     try:
         with open(balance_file_path, 'r') as file:
@@ -133,3 +152,23 @@ def report(bot: telebot, USER_ID: str):
     except Exception as e:
         bot.send_message(USER_ID, f'Произошла ошибка при отправке отчёта.')
         logging.error(f'Error while sending report: {e}')
+
+def balance_reset(bot: telebot.TeleBot, USER_ID: str):
+    data = get_full_balance()
+    current_month = datetime.datetime.now().strftime('%B')
+    previous_month = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%B')
+    previous_balance = data['year'].get(previous_month, {}).get('balance', 0)
+    
+    report(bot, USER_ID)
+    
+    data['year'][current_month] = {
+        'balance': previous_balance,
+        'saldo': 0
+    }
+    data['income'] = [0] * 31
+    data['expenses'] = [0] * 31
+
+    with open(balance_file_path, 'w') as file:
+        json.dump(data, file, indent=4)
+
+    logging.info('Monthly report was sent and balances were reset')

@@ -1,16 +1,14 @@
-import subprocess
 import datetime
 import schedule
 import telebot
 import logging
-import shlex
 import time
 import os
 from dotenv import load_dotenv
-from weasyprint import HTML # type: ignore
-from telebot import types
 from libs.balance import *
+from libs.support import *
 from libs.email import *
+from libs.files import *
 
 # +TODO: /start - приветствие
 # +TODO: /help - список команд
@@ -19,21 +17,24 @@ from libs.email import *
 # +TODO: /balance - текущий баланс
 # +TODO: /balance <число> - изменить баланс на число
 # TODO: /notification <дата> <время> <сообщение> - уведомление
-# TODO: /notification list - список уведомлений
+# TODO: /notification - список уведомлений
 # TODO: /notification delete <номер> - удалить уведомление
 # TODO: /task <сообщение> - добавить задачу
-# TODO: /task list - список задач
+# TODO: /task - список задач
 # TODO: /task delete <номер> - удалить задачу
 # +TODO: /email <address> <сообщение> - отправить сообщение на почту
 # +TODO: /email - список сообщений на почту
-# TODO: /save - сохранить файл на веб-сервере
-# TODO: /share <название> - поделиться файлом
-# TODO: /delete <название> - удалить файл
+# +TODO: Сохранить файл на веб-сервере
+# +TODO: /files - Список файлов
+# +TODO: /share <название> - поделиться файлом
+# +TODO: /delete <название> - удалить файл
+# +TODO: /download <название> - скачать файл
 # +TODO: /log - лог действий
 # +TODO: /ssh <команда> - выполнить команду на сервере
 # TODO: /stats - статистика Beget
 
 # TODO: restruct yaer data, add dataclasses
+# TODO: auto log clearing
 
 #########################
 #                       #
@@ -75,28 +76,16 @@ def everyday_job():
         day = datetime.datetime.now().strftime('%d')
         logging.info(f'Everyday job started. Day: {day}')
         if day == '01':
-            data = get_full_balance()
-            current_month = datetime.datetime.now().strftime('%B')
-            previous_month = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime('%B')
-            previous_balance = data['year'].get(previous_month, {}).get('balance', 0)
+            balance_reset(bot, USER_ID)
             
-            report(bot, USER_ID)
-            
-            data['year'][current_month] = {
-                'balance': previous_balance,
-                'saldo': 0
-            }
-            data['income'] = [0] * 31
-            data['expenses'] = [0] * 31
-            
-            with open(balance_file_path, 'w') as file:
-                json.dump(data, file, indent=4)
-            
-            logging.info('Monthly report was sent and balances were reset')
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
 
 def main():
+    if not os.path.exists('files'):
+        os.makedirs('files')
+    if not os.path.exists('public_files'):
+        os.makedirs('public_files')
     everyday_job()
     schedule.every().day.at("00:00").do(everyday_job)
     bot.send_message(USER_ID, 'Секретарь запущен')
@@ -117,7 +106,10 @@ def main():
 @bot.message_handler(commands=['start'])
 def start(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
-    bot.send_message(message.from_user.id, 'Приветствую! Я бот - личный секретарь. Своего босса не раскрою, но если хотите себе такого же, введите /link.\nЕсли хотите узнать, что я умею, введите /help.\nЧтобы написать моему боссу анонимное сообщение, введите /call.')
+    bot.send_message(message.from_user.id, ('Приветствую! Я бот - личный секретарь.\n'
+                    'Своего босса не раскрою, но если хотите себе такого же, введите /link.\n'
+                    'Если хотите узнать, что я умею, введите /help.\n'
+                    'Чтобы написать моему боссу анонимное сообщение, введите /call.'))
 
 @bot.message_handler(commands=['link'])
 def link(message: telebot.types.Message):
@@ -129,23 +121,7 @@ def balance(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
-    message_parts = message.text.split(' ')
-    if len(message_parts) == 1:
-        data = get_full_balance()
-        mounth_plot(data)
-        current_balance, current_saldo = get_balance()
-        month = datetime.datetime.now().strftime('%B')
-        caption = f'Текущий месяц: {month}\n\nВаш баланс: `{current_balance}`\nСальдо: `{current_saldo}`'
-        with open('mounth_plot.png', 'rb') as photo:
-            bot.send_photo(message.from_user.id, photo, caption=caption, parse_mode='Markdown')
-        os.remove('mounth_plot.png')
-    else:
-        try:
-            new_balance = float(message_parts[1])
-            update_balance(new_balance)
-            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`', parse_mode='Markdown')
-        except ValueError:
-            bot.send_message(message.from_user.id, 'Неверный формат параметра')
+    balance_main(message, bot)
 
 @bot.message_handler(commands=['report'])
 def rpt(message: telebot.types.Message):
@@ -168,65 +144,47 @@ def log(message: telebot.types.Message):
     if not check(message.from_user.id):
         return
     
-    with open('./secretary.log', 'r') as file:
-        lines = file.readlines()
-        log = ''.join(lines[-25:])
-    bot.send_message(message.from_user.id, log)
+    get_log(message, bot)
 
 @bot.message_handler(commands=['help'])
 def help(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
 
     bot.send_message(message.from_user.id, (
-        'Список команд:\n\n'
-        '/start - приветствие\n'
-        '/help - список команд\n'
-        '/call - написать владельцу бота\n'
-        '/report - отчёт по балансу\n'
-        '/balance - текущий баланс\n'
-        '/balance <число> - изменить баланс на число\n'
-        '/notification <дата> <время> <сообщение> - уведомление\n'
-        '/notification list - список уведомлений\n'
-        '/notification delete <номер> - удалить уведомление\n'
-        '/task <сообщение> - добавить задачу\n'
-        '/task list - список задач\n'
-        '/task delete <номер> - удалить задачу\n'
-        '/email <address> <сообщение> - отправить сообщение на почту\n'
-        '/email - список сообщений на почту\n'
-        '/save - сохранить файл на веб-сервере\n'
-        '/share <название> - поделиться файлом\n'
-        '/delete <название> - удалить файл\n'
-        '/log - лог действий\n'
-        '/ssh <команда> - выполнить команду на сервере\n'
-        '/stats - статистика Beget'
-    ))
+        '*Список команд*\n\n'
+        'Общедоступные команды:\n'
+        '- /help - список команд\n'
+        '- /call - написать владельцу бота\n'
+        '- /pfiles - посмотреть список общедоступных файлов\n'
+        '- /pdownload <название> - скачать общедоступный файл\n'
+        '- /link - ссылка на исходный код бота\n\n'
+        'Приватные команды:\n'
+        '- /report - отчёт по балансу\n'
+        '- /balance - текущий баланс\n'
+        '- /balance <число> - изменить баланс на число\n'
+        '- /notification <дата> <время> <сообщение> - уведомление\n'
+        '- /notification - список уведомлений\n'
+        '- /notification delete <номер> - удалить уведомление\n'
+        '- /task <сообщение> - добавить задачу\n'
+        '- /task - список задач\n'
+        '- /task delete <номер> - удалить задачу\n'
+        '- /email <address> <сообщение> - отправить сообщение на почту\n'
+        '- /email - список сообщений на почту\n'
+        '- /save - сохранить файл на веб-сервере\n'
+        '- /share <название> - поделиться файлом\n'
+        '- /download <название> - скачать файл\n'
+        '- /delete <название> - удалить файл\n'
+        '- /pdelete <название> - удалить общедоступный файл\n'
+        '- /log - лог действий\n'
+        '- /ssh <команда> - выполнить команду на сервере\n'
+        '- /stats - статистика Beget'
+    ), parse_mode='Markdown')
 
 @bot.message_handler(commands=['ssh'])
-def ssh(message: telebot.types.Message):
+def ssh_callback(message: telebot.types.Message):
     if not check(message.from_user.id):
         return
-    try:
-        bot.send_chat_action(message.chat.id, 'typing')
-        
-        message_parts = shlex.split(message.text)
-        command = message_parts[1]
-        params = [part for part in message_parts[2:] if not part.startswith('-')]
-        flags = [part for part in message_parts[2:] if part.startswith('-')]
-
-        if 'sudo' in message_parts:
-            logging.warning(f'User {message.from_user.id} tried to use sudo')
-            bot.send_message(message.from_user.id, "Использование команды 'sudo' запрещено.")
-            return
-
-        result = subprocess.run([command] + params + flags, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        
-        if result.returncode == 0:
-            bot.send_message(message.from_user.id, f'Результат выполнения команды:\n\n```{result.stdout}```', parse_mode='Markdown')
-        else:
-            bot.send_message(message.from_user.id, f'Ошибка выполнения команды:\n\n```{result.stderr}```', parse_mode='Markdown')
-    except Exception as e:
-        bot.send_message(message.from_user.id, "Произошла ошибка")
-        logging.error(f'Error in ssh: {e}')
+    ssh(message, bot)
 
 @bot.message_handler(commands=['email'])
 def email_command(message: telebot.types.Message):
@@ -234,30 +192,7 @@ def email_command(message: telebot.types.Message):
     if not check(message.from_user.id):
         return
     
-    message_parts = message.text.split(' ')
-    if len(message_parts) < 2:
-        emails = emails_list()
-        if not emails:
-            bot.send_message(message.from_user.id, 'Нет новых сообщений')
-            return
-
-        email_list = ""
-        for index, email in enumerate(emails):
-            email_list += f"{index + 1}. {email['From']}:\n{email['Subject']}\nПрочесть: /email\_read\_{index}\n\n"
-
-        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`:\n\n{email_list}', parse_mode='Markdown')
-        return
-    
-    try:
-        current_directory = os.path.dirname(os.path.abspath(__file__))
-        template = os.path.join(current_directory, 'data', 'email.html')
-
-        send_email(message_parts[1], ' '.join(message_parts[2:]), template)
-        
-        bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
-    except Exception as e:
-        logging.error(f'Error in email: {e}')
-        bot.send_message(message.from_user.id, 'Произошла ошибка')
+    email_main(message)
 
 @bot.message_handler(func=lambda message: message.text.startswith('/email_read_'))
 def email_read_command(message: telebot.types.Message):
@@ -265,22 +200,67 @@ def email_read_command(message: telebot.types.Message):
         return
     bot.send_chat_action(message.chat.id, 'typing')
     
-    try:
-        email_index = int(message.text.split('_')[-1])
-        
-        email = email_read(email_index)
-        email_html = f"<h1>{email['From']}</h1><h2>{email['Subject']}</h2><p>{email['Body']}</p>"
-        
-        pdf_path = f"/tmp/email_{email_index}.pdf"
-        HTML(string=email_html).write_pdf(pdf_path)
-        
-        with open(pdf_path, 'rb') as pdf_file:
-            bot.send_document(message.from_user.id, pdf_file)
-        
-        os.remove(pdf_path)
-    except Exception as e:
-        logging.error(f"Error handling email_read command: {e}")
-        bot.send_message(message.from_user.id, 'Произошла ошибка при обработке сообщения')
+    email_read(message, bot)
+
+@bot.message_handler(content_types=['document'])
+def save_file(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    save_doc(message, bot)
+
+@bot.message_handler(commands=["download"])
+def download(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    download_file(message, bot, 1)
+
+@bot.message_handler(commands=["files"])
+def list_file(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    show_files(message, bot, 1)
+
+@bot.message_handler(commands=["pdownload"])
+def download(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    download_file(message, bot)
+
+@bot.message_handler(commands=["pfiles"])
+def list_file(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    show_files(message, bot)
+
+@bot.message_handler(commands=["share"])
+def share(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    share_file(message, bot)
+
+@bot.message_handler(commands=["delete"])
+def delete(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    delete_file(message, bot, 1)
+
+@bot.message_handler(commands=["pdelete"])
+def delete(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    delete_file(message, bot)
 
 
 
