@@ -9,6 +9,7 @@ from libs.balance import *
 from libs.support import *
 from libs.email import *
 from libs.files import *
+from libs.vps import *
 
 # +TODO: /start - приветствие
 # +TODO: /help - список команд
@@ -31,10 +32,9 @@ from libs.files import *
 # +TODO: /download <название> - скачать файл
 # +TODO: /log - лог действий
 # +TODO: /ssh <команда> - выполнить команду на сервере
-# TODO: /stats - статистика Beget
+# +TODO: /stats - статистика Beget
 
 # TODO: restruct yaer data, add dataclasses
-# TODO: auto log clearing
 
 #########################
 #                       #
@@ -77,7 +77,10 @@ def everyday_job():
         logging.info(f'Everyday job started. Day: {day}')
         if day == '01':
             balance_reset(bot, USER_ID)
-            
+    
+        clean_logs()
+        logging.info("Логи очищены")
+
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
 
@@ -208,7 +211,13 @@ def save_file(message: telebot.types.Message):
     if not check(message.from_user.id):
         return
     
-    save_doc(message, bot)
+    try:
+        if 'email' in message.caption.lower():
+            email_main(message, bot, 1)
+        else:
+            save_doc(message, bot)
+    except:
+        save_doc(message, bot)
 
 @bot.message_handler(commands=["download"])
 def download(message: telebot.types.Message):
@@ -261,6 +270,14 @@ def delete(message: telebot.types.Message):
         return
     
     delete_file(message, bot)
+
+@bot.message_handler(commands=["stats"])
+def stats(message: telebot.types.Message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.from_user.id):
+        return
+    
+    get_vps_data(message, bot)
 
 
 

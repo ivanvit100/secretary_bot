@@ -6,21 +6,23 @@ import email
 from email.mime.multipart import MIMEMultipart
 from email.header import decode_header
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
 from dotenv import load_dotenv
+from email import encoders
 from weasyprint import HTML # type: ignore
 from telebot import types
 import os
 
 load_dotenv()
 
-# TODO: прикрепление файлов к сообщению
-
 EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+IMAP_ADDRESS = os.getenv('IMAP_ADDRESS')
+SMTP_ADDRESS = os.getenv('SMTP_ADDRESS')
 
-def email_main(message: telebot.types.Message, bot: telebot.TeleBot):
-    message_parts = message.text.split(' ')
-    if len(message_parts) < 2:
+def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment: bool = 0):
+    message_parts = message.text.split(' ') if not attachment else message.caption.split(' ')
+    if len(message_parts) < 2 and not attachment:
         emails = emails_list()
         if not emails:
             bot.send_message(message.from_user.id, 'Нет новых сообщений')
@@ -34,22 +36,35 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot):
         return
     
     try:
-        current_directory = os.path.dirname(os.path.abspath(__file__))
+        current_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         template = os.path.join(current_directory, 'data', 'email.html')
 
-        send_email(message_parts[1], ' '.join(message_parts[2:]), template)
+        if attachment:
+            file_info = bot.get_file(message.document.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+
+            save_path = os.path.join(current_directory, file_info.file_path)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+            with open(save_path, 'wb') as new_file:
+                new_file.write(downloaded_file)
+
+            send_email(message_parts[1], ' '.join(message_parts[2:]), template, save_path)
+            os.remove(save_path)
+        else:
+            send_email(message_parts[1], ' '.join(message_parts[2:]), template)
         
         bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
     except Exception as e:
         logging.error(f'Error in email: {e}')
         bot.send_message(message.from_user.id, 'Произошла ошибка')
 
-def send_email(to_address: str, subject: str, template_path: str):
+def send_email(to_address: str, subject: str, template_path: str, attachment_path: str):
     try:
         with open(template_path, 'r', encoding='utf-8') as file:
             email_content = file.read()
 
-        email_content = email_content.replace('{{message}}', ' '.join(subject))
+        email_content = email_content.replace('{{message}}', subject)
 
         msg = MIMEMultipart()
         msg['From'] = EMAIL_ADDRESS
@@ -58,7 +73,17 @@ def send_email(to_address: str, subject: str, template_path: str):
 
         msg.attach(MIMEText(email_content, 'html'))
 
-        with smtplib.SMTP_SSL('smtp.beget.com', 465) as server:
+        with open(attachment_path, 'rb') as attachment:
+            part = MIMEBase('application', 'octet-stream')
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header(
+                'Content-Disposition',
+                f'attachment; filename= {attachment_path}',
+            )
+            msg.attach(part)
+
+        with smtplib.SMTP_SSL(SMTP_ADDRESS, 465) as server:
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             server.send_message(msg)
 
@@ -70,7 +95,7 @@ def send_email(to_address: str, subject: str, template_path: str):
 def emails_list():
     emails = []
     try:
-        mail = imaplib.IMAP4_SSL('imap.beget.com')
+        mail = imaplib.IMAP4_SSL(IMAP_ADDRESS)
         mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         mail.select('inbox')
 
@@ -102,7 +127,7 @@ def emails_list():
 
 def email_read_body(num: int):
     try:
-        mail = imaplib.IMAP4_SSL('imap.beget.com')
+        mail = imaplib.IMAP4_SSL(IMAP_ADDRESS)
         mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         mail.select('inbox')
 

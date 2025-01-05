@@ -1,7 +1,8 @@
 import shlex
 import telebot
-import subprocess
 import logging
+import datetime
+import subprocess
 
 def ssh(message: telebot.types.Message, bot: telebot.TeleBot):
     try:
@@ -32,3 +33,23 @@ def get_log(message: telebot.types.Message, bot: telebot.TeleBot):
         lines = file.readlines()
         log = ''.join(lines[-25:])
     bot.send_message(message.from_user.id, log)
+
+def clean_logs():
+    log_file_path = './secretary.log'
+    with open(log_file_path, 'r') as file:
+        lines = file.readlines()
+
+    three_days_ago = datetime.datetime.now() - datetime.timedelta(days=3)
+    filtered_lines = []
+
+    for line in lines:
+        try:
+            log_date_str = line.split(' ')[0]
+            log_date = datetime.datetime.strptime(log_date_str, '%Y-%m-%d')
+            if log_date >= three_days_ago:
+                filtered_lines.append(line)
+        except ValueError:
+            continue
+
+    with open(log_file_path, 'w') as file:
+        file.writelines(filtered_lines)
