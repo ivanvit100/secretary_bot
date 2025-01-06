@@ -43,7 +43,7 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
             file_info = bot.get_file(message.document.file_id)
             downloaded_file = bot.download_file(file_info.file_path)
 
-            save_path = os.path.join(current_directory, file_info.file_path)
+            save_path = os.path.join(current_directory, message.document.file_name)
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
             with open(save_path, 'wb') as new_file:
@@ -59,7 +59,7 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
         logging.error(f'Error in email: {e}')
         bot.send_message(message.from_user.id, 'Произошла ошибка')
 
-def send_email(to_address: str, subject: str, template_path: str, attachment_path: str):
+def send_email(to_address: str, subject: str, template_path: str, attachment_path: str = ""):
     try:
         with open(template_path, 'r', encoding='utf-8') as file:
             email_content = file.read()
@@ -73,15 +73,16 @@ def send_email(to_address: str, subject: str, template_path: str, attachment_pat
 
         msg.attach(MIMEText(email_content, 'html'))
 
-        with open(attachment_path, 'rb') as attachment:
-            part = MIMEBase('application', 'octet-stream')
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header(
-                'Content-Disposition',
-                f'attachment; filename= {attachment_path}',
-            )
-            msg.attach(part)
+        if len(attachment_path) > 0:
+            with open(attachment_path, 'rb') as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="{os.path.basename(attachment_path)}"',
+                )
+                msg.attach(part)
 
         with smtplib.SMTP_SSL(SMTP_ADDRESS, 465) as server:
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
