@@ -4,7 +4,9 @@ import telebot
 import logging
 import time
 import os
+from threading import Thread
 from dotenv import load_dotenv
+from libs.notification import *
 from libs.balance import *
 from libs.support import *
 from libs.email import *
@@ -17,12 +19,12 @@ from libs.vps import *
 # +TODO: /report - отчёт по балансу
 # +TODO: /balance - текущий баланс
 # +TODO: /balance <число> - изменить баланс на число
-# TODO: /notification <дата> <время> <сообщение> - уведомление
-# TODO: /notification - список уведомлений
-# TODO: /notification delete <номер> - удалить уведомление
+# +TODO: /notification <дата> <время> <сообщение> - уведомление
+# +TODO: /notification - список уведомлений
+# +TODO: /notification delete <номер> - удалить уведомление
 # TODO: /task <сообщение> - добавить задачу
 # TODO: /task - список задач
-# TODO: /task delete <номер> - удалить задачу
+# TODO: /task deletНет, используй имe <номер> - удалить задачу
 # +TODO: /email <address> <сообщение> - отправить сообщение на почту
 # +TODO: /email - список сообщений на почту
 # +TODO: Сохранить файл на веб-сервере
@@ -278,6 +280,29 @@ def stats(message: telebot.types.Message):
         return
     
     get_vps_data(message, bot)
+
+@bot.message_handler(commands=['notification'])
+def handle_schedule(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    if not check(message.chat.id):
+        return
+    message_parts = message.text.split(' ')
+    try:
+        if len(message_parts) < 3:
+            schedule_list(bot)
+        elif message_parts[1] == 'delete':
+            job_id = int(message_parts[2])
+            cancel_scheduled_message(job_id)
+            bot.reply_to(message, f'Уведомление {job_id} удалено.')
+        else:
+            _, date, run_at, msg = message.text.split(' ', 3)
+            run_at = f"{date} {run_at}"
+            schedule_message(msg, run_at, bot)
+            logging.info(f'Notification scheduled: {run_at} {msg}')
+            bot.reply_to(message, f'Сообщение будет отправлено в {run_at}.')
+    except Exception as e:
+        logging.error(f'Error in handle_schedule: {e}')
+        bot.reply_to(message, 'Произошла ошибка.')
 
 
 
