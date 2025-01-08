@@ -15,7 +15,7 @@ def send_delayed_message(message: str, bot: telebot.TeleBot):
 
 def schedule_message(message: str, run_at: str, bot: telebot.TeleBot):
     run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
-    delay = (run_at_datetime - datetime.datetime.now()).total_seconds()
+    delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3)).total_seconds()
     
     if delay > 0:
         timer = Timer(delay, send_delayed_message, [message, bot])

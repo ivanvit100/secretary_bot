@@ -137,6 +137,12 @@ def email_read_body(num: int):
 
         email_id = email_ids[num]
 
+        total_emails = len(email_ids)
+        if total_emails > 10:
+            email_id = email_ids[-10 + num]
+        else:
+            email_id = email_ids[num]
+
         _, msg_data = mail.fetch(email_id, '(RFC822)')
         for response_part in msg_data:
             if isinstance(response_part, tuple):
