@@ -13,29 +13,6 @@ from libs.files import *
 from libs.task import *
 from libs.vps import *
 
-# +TODO: /start - приветствие
-# +TODO: /help - список команд
-# +TODO: /call - написать владельцу бота
-# +TODO: /report - отчёт по балансу
-# +TODO: /balance - текущий баланс
-# +TODO: /balance <число> - изменить баланс на число
-# +TODO: /notification <дата> <время> <сообщение> - уведомление
-# +TODO: /notification - список уведомлений
-# +TODO: /notification delete <номер> - удалить уведомление
-# TODO: /task <название> <сообщение> - добавить задачу
-# TODO: /task - список задач
-# TODO: /task_done_<номер> - удалить задачу
-# +TODO: /email <address> <сообщение> - отправить сообщение на почту
-# +TODO: /email - список сообщений на почту
-# +TODO: Сохранить файл на веб-сервере
-# +TODO: /files - Список файлов
-# +TODO: /share <название> - поделиться файлом
-# +TODO: /delete <название> - удалить файл
-# +TODO: /download <название> - скачать файл
-# +TODO: /log - лог действий
-# +TODO: /ssh <команда> - выполнить команду на сервере
-# +TODO: /stats - статистика Beget
-
 # TODO: restruct yaer data, add dataclasses
 
 #########################
@@ -73,15 +50,28 @@ def check(id):
         return False
 
 def everyday_job():
-    # TODO: todo and notifications
     try:
         day = datetime.datetime.now().strftime('%d')
         logging.info(f'Everyday job started. Day: {day}')
         if day == '01':
             balance_reset(bot, USER_ID)
+
+            tasks = read_json()
+            tasks["complete"] = 0
+            
+            with open('data/tasks.json', 'w') as file:
+                json.dump(tasks, file, indent=4, ensure_ascii=False)
+            
+            logging.info('Statistic reset')
     
         clean_logs()
         logging.info("Логи очищены")
+
+        tasks = read_json()
+        count = len(tasks["tasks"])
+        completed = tasks["complete"]
+        balance, saldo = get_balance()
+        bot.send_message(USER_ID, f'*Краткая сводка на день*\n\nБаланс: `{balance}`\nСальдо: `{saldo}`\n\nЗадачи: `{count}`\nВыполнено в этом месяце: `{completed}`', parse_mode='Markdown')
 
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
@@ -320,8 +310,8 @@ def handle_task(message):
     try:
         if len(message_parts) < 2:
             tasks_list(message, bot)
-        # elif message_parts[1] == 'delete':
-        #     task_done(message, bot)
+        elif message_parts[1] == 'delete':
+            task_done(message, bot)
         else:
             task_add(message, bot)
     
