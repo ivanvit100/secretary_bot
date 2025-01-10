@@ -14,6 +14,11 @@ from libs.task import *
 from libs.vps import *
 
 # TODO: restruct yaer data, add dataclasses
+# TODO: add configs
+# TODO: validate configs on start
+# TODO: creating directories on start
+# TODO: add install script
+# TODO: add multilanguage support
 
 #########################
 #                       #
