@@ -46,35 +46,47 @@ This file on another languages:
 git clone https://github.com/ivanvit100/secretary_bot
 cd secretary_bot
 ```
-2. Создайте и активируйте виртуальное окружение:
+2. Запустите скрипт установки:
 ```sh
-python3 -m venv venv
+python setup.py
+```
+3. В процессе установки скрипт выполнит:
+    - Создание необходимых директорий (`data`, `files`, `public_files`, `documents`)
+    - Настройку виртуального окружения Python
+    - Установку требуемых пакетов из [`requirements.txt`](/requirements.txt)
+    - Создание файлов-шаблонов:
+        - `balance.json` - для отслеживания финансовых данных
+        - `tasks.json` - для управления задачами
+        - `email.html` - шаблон электронной почты
+4. При запросе введите следующую информацию:
+```sh
+Telegram Bot Token: [Токен бота, полученный от @BotFather]
+Your Telegram User ID: [Ваш ID в Telegram]
+Email Address: [Адрес электронной почты для отправки уведомлений]
+Email Password: [Пароль от электронной почты - ввод будет скрыт]
+SMTP Server Address: [Нажмите Enter для стандартного значения (smtp.gmail.com) или введите свой сервер]
+IMAP Server Address: [Нажмите Enter для стандартного значения (imap.gmail.com) или введите свой сервер]
+VPS User Stats URL: [URL для статистики VPS (бот настроен под использование API Beget)]
+```
+5. Пользователям Linux будет предложено установить сервис systemd:
+```sh
+Do you want to install the secretary.service for automatic startup? (y/n):
+```
+- Если вы выберете `y`, скрипт:
+    - Создаст файл службы `systemd`
+    - Запросит пароль `sudo` для установки службы
+    - Включит автозапуск службы при загрузке системы
+    - Сразу же запустит службу
+6. После успешной установки активируйте окружение и запустите бота:
+- Для Linux/Mac:
+```sh
 source venv/bin/activate
+python main.py
 ```
-3. Установите зависимости:
-```sh
-pip install -r requirements.txt
-```
-4. Создайте файл `.env` и добавьте в него ваш токен бота и ID пользователя, логин и пароль почтового ящика, smtp и imap сервера, а также ссылку для API сервера:
-```
-BOT_TOKEN = your_bot_token
-USER_ID = your_user_id
-
-EMAIL_ADDRESS = email@example.com
-EMAIL_PASSWORD = your_password
-
-SMTP_ADDRESS = smtp.example.com
-IMAP_ADDRESS = imap.example.com
-
-VPS_USER_STATS = https://...
-```
-5. Отредактируйте конфиги и secretary.servce.
-6. Настройте и запустите службу systemd:
-```sh
-sudo cp secretary.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable secretary.service
-sudo systemctl start secretary.service
+- Для Windows:
+```cmd
+.\venv\Scripts\activate
+python main.py
 ```
 
 ## Использование

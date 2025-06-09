@@ -46,35 +46,47 @@ This file on another languages:
 git clone https://github.com/ivanvit100/secretary_bot
 cd secretary_bot
 ```
-2. Create and activate a virtual environment:
+2. Run the setup script:
 ```sh
-python3 -m venv venv
+python setup.py
+```
+3. During the setup process, the script will:
+    - Create necessary directories (`data`, `files`, `public_files`, `documents`)
+    - Set up a Python virtual environment
+    - Install required packages from [`requirements.txt`](/requirements.txt)
+    - Create templet files:
+        - `balance.json` - for tracking financial data
+        - `tasks.json` - for managing tasks
+        - `email.html` - email template
+4. When prompted, provide the following information:
+```sh
+Telegram Bot Token: [Your bot token from @BotFather]
+Your Telegram User ID: [Your Telegram user ID]
+Email Address: [Email address for sending notifications]
+Email Password: [Email password - input will be hidden]
+SMTP Server Address: [Press Enter for default (smtp.gmail.com) or enter custom]
+IMAP Server Address: [Press Enter for default (imap.gmail.com) or enter custom]
+VPS User Stats URL: [URL for VPS statistics]
+```
+5. Linux users will be asked if they want to install a systemd service:
+```sh
+Do you want to install the secretary.service for automatic startup? (y/n):
+```
+- If you select `y`, the script will:
+    - Create a `systemd` service file
+    - Ask for `sudo` password to install the service
+    - Enable the service to start on system boot
+    - Start the service immediately
+6. After successful setup, activate the environment and start the bot:
+- For Linux/Mac:
+```sh
 source venv/bin/activate
+python main.py
 ```
-3. Install dependencies:
-```sh
-pip install -r requirements.txt
-```
-4. Create a `.env` file and add your bot token, user ID, email login and password, SMTP and IMAP servers, and API server link:
-```
-BOT_TOKEN = your_bot_token
-USER_ID = your_user_id
-
-EMAIL_ADDRESS = email@example.com
-EMAIL_PASSWORD = your_password
-
-SMTP_ADDRESS = smtp.example.com
-IMAP_ADDRESS = imap.example.com
-
-VPS_USER_STATS = https://...
-```
-5. Edit the configs and `secretary.service`.
-6. Set up and start the systemd service:
-```sh
-sudo cp secretary.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable secretary.service
-sudo systemctl start secretary.service
+- For Windows:
+```cmd
+.\venv\Scripts\activate
+python main.py
 ```
 
 ## Usage
