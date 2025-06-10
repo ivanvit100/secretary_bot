@@ -1,3 +1,4 @@
+import threading
 import datetime
 import schedule
 import telebot
@@ -77,15 +78,30 @@ def everyday_job():
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
 
+def schedule_checker():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
 def main():
     if not os.path.exists('files'):
         os.makedirs('files')
     if not os.path.exists('public_files'):
         os.makedirs('public_files')
+    if not os.path.exists('data'):
+        os.makedirs('data')
+        
     everyday_job()
-    schedule.every().day.at("00:00").do(everyday_job)
+    
+    schedule.every().day.at("06:00").do(everyday_job)
+    
+    scheduler_thread = threading.Thread(target=schedule_checker)
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
+    
     bot.send_message(USER_ID, 'Секретарь запущен')
     logging.info('Secretary bot started')
+    
     while True:
         try:
             bot.polling(none_stop=True, interval=0, timeout=20)
