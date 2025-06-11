@@ -35,6 +35,7 @@ This file on another languages:
 - `/log` - Show the last 25 lines of logs.
 - `/ssh <command>` - Execute a command on the server.
 - `/stats` - Show Beget statistics.
+- `/language` - Change interface language.
 
 ### Automatic Tasks
 - Daily task check.
@@ -77,7 +78,9 @@ Do you want to install the secretary.service for automatic startup? (y/n):
     - Ask for `sudo` password to install the service
     - Enable the service to start on system boot
     - Start the service immediately
-6. After successful setup, activate the environment and start the bot:
+6. Настройте пользовательские переменные в [`config.py`](/config.py) (предпочитаемый язык, имя владельца бота и тд)
+6. Set user variables in the [`config.py`](/config.py) file (prefered language, name of bot owner, etc.)
+7. After successful setup, activate the environment and start the bot:
 - For Linux/Mac:
 ```sh
 source venv/bin/activate

@@ -3,10 +3,11 @@ import json
 import telebot
 import logging
 import datetime
-import numpy as np # type: ignore
-from sklearn.preprocessing import StandardScaler # type: ignore
-from sklearn.linear_model import LinearRegression # type: ignore
+import numpy as np
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
 from libs.plots import *
+from i18n import _
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 balance_file_path = os.path.join(current_dir, '../data/balance.json')
@@ -18,7 +19,7 @@ def balance_main(message: telebot.types.Message, bot: telebot.TeleBot):
         mounth_plot(data)
         current_balance, current_saldo = get_balance()
         month = datetime.datetime.now().strftime('%B')
-        caption = f'Текущий месяц: {month}\n\nВаш баланс: `{current_balance}`\nСальдо: `{current_saldo}`'
+        caption = _('balance_current_month', month=month, balance=current_balance, saldo=current_saldo)
         with open('mounth_plot.png', 'rb') as photo:
             bot.send_photo(message.from_user.id, photo, caption=caption, parse_mode='Markdown')
         os.remove('mounth_plot.png')
@@ -26,9 +27,9 @@ def balance_main(message: telebot.types.Message, bot: telebot.TeleBot):
         try:
             new_balance = float(message_parts[1])
             update_balance(new_balance)
-            bot.send_message(message.from_user.id, f'Баланс обновлен: `{new_balance}`', parse_mode='Markdown')
+            bot.send_message(message.from_user.id, _('balance_updated', value=new_balance), parse_mode='Markdown')
         except ValueError:
-            bot.send_message(message.from_user.id, 'Неверный формат параметра')
+            bot.send_message(message.from_user.id, _('balance_invalid_format'))
 
 def get_balance(month = -1):
     try:
@@ -121,18 +122,18 @@ def report(bot: telebot, USER_ID: str):
         total_expenses = sum(data['expenses'])
 
         caption = (
-            f'Отчёт по балансу\n\n'
-            f'Прогнозированный баланс на текущий месяц: `{round(forecast_balance_current, 2)}`\n'
-            f'Прогнозированное сальдо на текущий месяц: `{round(forecast_saldo_current, 2)}`\n'
-            f'Прогнозированный баланс на следующий месяц: `{round(forecast_balance_next, 2)}`\n'
-            f'Прогнозированное сальдо на следующий месяц: `{round(forecast_saldo_next, 2)}`\n\n'
-            f'Текущие доходы: `{total_income}`\n'
-            f'Текущие расходы: `{total_expenses}`\n\n'
-            f'Средний баланс за год: `{round(avg_balance, 2)}`\n'
-            f'Среднее сальдо за год: `{round(avg_saldo, 2)}`\n'
-            f'Максимальный баланс за год: `{round(max_balance, 2)}` ({max_balance_month})\n'
-            f'Минимальный баланс за год: `{round(min_balance, 2)}` ({min_balance_month})\n\n'
-            f'Итоговый приход за год: `{round(sum(saldos), 2)}`\n'
+            f'{_("balance_report_title")}\n\n'
+            f'{_("balance_forecast_current", value=round(forecast_balance_current, 2))}\n'
+            f'{_("balance_forecast_saldo_current", value=round(forecast_saldo_current, 2))}\n'
+            f'{_("balance_forecast_next", value=round(forecast_balance_next, 2))}\n'
+            f'{_("balance_forecast_saldo_next", value=round(forecast_saldo_next, 2))}\n\n'
+            f'{_("balance_current_income", value=total_income)}\n'
+            f'{_("balance_current_expenses", value=total_expenses)}\n\n'
+            f'{_("balance_avg_year", value=round(avg_balance, 2))}\n'
+            f'{_("balance_avg_saldo_year", value=round(avg_saldo, 2))}\n'
+            f'{_("balance_max_year", value=round(max_balance, 2), month=max_balance_month)}\n'
+            f'{_("balance_min_year", value=round(min_balance, 2), month=min_balance_month)}\n\n'
+            f'{_("balance_total_year", value=round(sum(saldos), 2))}\n'
         )
 
         media = []
@@ -150,7 +151,7 @@ def report(bot: telebot, USER_ID: str):
         except:
             pass
     except Exception as e:
-        bot.send_message(USER_ID, f'Произошла ошибка при отправке отчёта.')
+        bot.send_message(USER_ID, _('balance_report_error'))
         logging.error(f'Error while sending report: {e}')
 
 def balance_reset(bot, user_id):
@@ -173,7 +174,7 @@ def balance_reset(bot, user_id):
             current_index = months.index(current_month)
         except ValueError:
             logging.error(f"Не найден месяц {current_month} в файле баланса")
-            bot.send_message(user_id, f"Ошибка: месяц {current_month} не найден в файле баланса")
+            bot.send_message(user_id, _('balance_reset_month_not_found', month=current_month))
             return
             
         prev_index = (current_index - 1) % 12
@@ -190,10 +191,10 @@ def balance_reset(bot, user_id):
         with open('data/balance.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
             
-        msg = f"*Ежемесячный сброс баланса*\n\n"
-        msg += f"Баланс на начало месяца: {prev_balance} (перенесено с {prev_month})\n"
-        msg += f"Сальдо обнулено\n"
-        msg += f"Доходы и расходы по дням сброшены"
+        msg = f"*{_('balance_reset_title')}*\n\n"
+        msg += f"{_('balance_reset_message', value=prev_balance, month=prev_month)}\n"
+        msg += f"{_('balance_reset_saldo')}\n"
+        msg += f"{_('balance_reset_daily')}"
         
         bot.send_message(user_id, msg, parse_mode="Markdown")
         logging.info(f"Баланс сброшен: {prev_month} -> {current_month}, balance: {prev_balance}")
@@ -202,5 +203,5 @@ def balance_reset(bot, user_id):
         
     except Exception as e:
         logging.error(f"Ошибка при сбросе баланса: {e}")
-        bot.send_message(user_id, f"Произошла ошибка при сбросе баланса: {e}")
+        bot.send_message(user_id, _('balance_reset_error', error=str(e)))
         return False

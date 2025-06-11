@@ -9,9 +9,9 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from dotenv import load_dotenv
 from email import encoders
-from weasyprint import HTML # type: ignore
-from telebot import types
+from weasyprint import HTML
 import os
+from i18n import _
 
 load_dotenv()
 
@@ -25,14 +25,14 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
     if len(message_parts) < 2 and not attachment:
         emails = emails_list()
         if not emails:
-            bot.send_message(message.from_user.id, 'Нет новых сообщений')
+            bot.send_message(message.from_user.id, _('email_no_messages'))
             return
 
         email_list = ""
-        for index, email in enumerate(emails):
-            email_list += f"{index + 1}. {email['From']}:\n{email['Subject']}\nПрочесть: /email\_read\_{index}\n\n"
+        for index, email_item in enumerate(emails):
+            email_list += f"{index + 1}. {email_item['From']}:\n{email_item['Subject']}\n{_('email_read_command', index=index)}\n\n"
 
-        bot.send_message(message.from_user.id, f'Список последних сообщений для `{EMAIL_ADDRESS}`:\n\n{email_list}', parse_mode='Markdown')
+        bot.send_message(message.from_user.id, f"{_('email_list_title', email=EMAIL_ADDRESS)}\n\n{email_list}", parse_mode='Markdown')
         return
     
     try:
@@ -54,10 +54,10 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
         else:
             send_email(message_parts[1], ' '.join(message_parts[2:]), template)
         
-        bot.send_message(message.from_user.id, 'Сообщение отправлено на почту')
+        bot.send_message(message.from_user.id, _('email_sent_success'))
     except Exception as e:
         logging.error(f'Error in email: {e}')
-        bot.send_message(message.from_user.id, 'Произошла ошибка')
+        bot.send_message(message.from_user.id, _('email_error'))
 
 def send_email(to_address: str, subject: str, template_path: str, attachment_path: str = ""):
     try:
@@ -69,7 +69,9 @@ def send_email(to_address: str, subject: str, template_path: str, attachment_pat
         msg = MIMEMultipart()
         msg['From'] = EMAIL_ADDRESS
         msg['To'] = to_address
-        msg['Subject'] = "Сообщение от Иванущенко Виталия"
+        
+        from config import NAME
+        msg['Subject'] = _('email_subject_default', name=NAME)
 
         msg.attach(MIMEText(email_content, 'html'))
 
@@ -91,7 +93,7 @@ def send_email(to_address: str, subject: str, template_path: str, attachment_pat
         logging.info('Email sent successfully')
     except Exception as e:
         logging.error(f'Email failed to send: {e}')
-        raise Exception('Email failed to send')
+        raise Exception(_('email_send_failed'))
 
 def emails_list():
     emails = []
@@ -193,4 +195,4 @@ def email_read(message: telebot.types.Message, bot: telebot.TeleBot):
         os.remove(pdf_path)
     except Exception as e:
         logging.error(f"Error handling email_read command: {e}")
-        bot.send_message(message.from_user.id, 'Произошла ошибка при обработке сообщения')
+        bot.send_message(message.from_user.id, _('email_read_error'))
