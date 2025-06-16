@@ -10,6 +10,7 @@ from email.mime.base import MIMEBase
 from dotenv import load_dotenv
 from email import encoders
 from weasyprint import HTML
+from telebot import types
 import os
 from i18n import _
 
@@ -28,11 +29,23 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
             bot.send_message(message.from_user.id, _('email_no_messages'))
             return
 
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
         email_list = ""
         for index, email_item in enumerate(emails):
-            email_list += f"{index + 1}. {email_item['From']}:\n{email_item['Subject']}\n{_('email_read_command', index=index)}\n\n"
-
-        bot.send_message(message.from_user.id, f"{_('email_list_title', email=EMAIL_ADDRESS)}\n\n{email_list}", parse_mode='Markdown')
+            subject = email_item['Subject']
+            if len(subject) > 50:
+                subject = subject[:47] + "..."
+            
+            button_text = f"📧 {index + 1}. {subject[:47]}..." if len(subject) > 20 else f"📧 {index + 1}. {subject}"
+            markup.add(types.InlineKeyboardButton(button_text, callback_data=f"email_read_{index}"))
+        
+        bot.send_message(
+            message.from_user.id,
+            f"*{_('email_list_title', email=EMAIL_ADDRESS)}*\n\n{email_list}",
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
         return
     
     try:
@@ -106,6 +119,7 @@ def emails_list():
         email_ids = messages[0].split()
 
         last_10_email_ids = email_ids[-10:]
+        last_10_email_ids.reverse() 
 
         for email_id in last_10_email_ids:
             _, msg_data = mail.fetch(email_id, '(RFC822)')
@@ -119,7 +133,7 @@ def emails_list():
 
                     emails.append({
                         'From': from_,
-                        'Subject': subject
+                        'Subject': subject if subject else _('email_no_subject')
                     })
 
         mail.logout()
@@ -137,13 +151,13 @@ def email_read_body(num: int):
         _, messages = mail.search(None, 'ALL')
         email_ids = messages[0].split()
 
-        email_id = email_ids[num]
-
-        total_emails = len(email_ids)
-        if total_emails > 10:
-            email_id = email_ids[-10 + num]
+        last_10_email_ids = email_ids[-10:]
+        last_10_email_ids.reverse()
+        
+        if num < len(last_10_email_ids):
+            email_id = last_10_email_ids[num]
         else:
-            email_id = email_ids[num]
+            raise ValueError(f"Email index {num} out of range")
 
         _, msg_data = mail.fetch(email_id, '(RFC822)')
         for response_part in msg_data:
@@ -157,10 +171,10 @@ def email_read_body(num: int):
 
                 if msg.is_multipart():
                     for part in msg.walk():
-                        part.get_content_type()
+                        content_type = part.get_content_type()
                         content_disposition = str(part.get('Content-Disposition'))
 
-                        if 'attachment' not in content_disposition:
+                        if 'attachment' not in content_disposition and content_type in ['text/plain', 'text/html']:
                             payload = part.get_payload(decode=True)
                             if payload:
                                 body += payload.decode(part.get_content_charset() or 'utf-8')
@@ -172,27 +186,34 @@ def email_read_body(num: int):
                 mail.logout()
                 return {
                     'From': from_,
-                    'Subject': subject,
+                    'Subject': subject if subject else _('email_no_subject'),
                     'Body': body
                 }
     except Exception as e:
-        logging.error(f'Error in email_read: {e}')
-        raise Exception('Error in email_read')
+        logging.error(f'Error in email_read_body: {e}')
+        raise Exception(_('email_read_error'))
 
-def email_read(message: telebot.types.Message, bot: telebot.TeleBot):
+def email_read(message, bot: telebot.TeleBot):
     try:
-        email_index = int(message.text.split('_')[-1])
+        if isinstance(message, types.CallbackQuery):
+            email_index = int(message.data.split('_')[-1])
+            user_id = message.from_user.id
+            bot.answer_callback_query(message.id)
+        else:
+            email_index = int(message.text.split('_')[-1])
+            user_id = message.from_user.id
         
-        email = email_read_body(email_index)
-        email_html = f"<h1>{email['From']}</h1><h2>{email['Subject']}</h2><p>{email['Body']}</p>"
+        email_data = email_read_body(email_index)
+        email_html = f"<h1>{email_data['From']}</h1><h2>{email_data['Subject']}</h2>{email_data['Body']}"
         
-        pdf_path = f"/tmp/email_{email_index}.pdf"
+        pdf_path = f"/tmp/email_{email_index + 1}.pdf"
         HTML(string=email_html).write_pdf(pdf_path)
         
         with open(pdf_path, 'rb') as pdf_file:
-            bot.send_document(message.from_user.id, pdf_file)
+            bot.send_document(user_id, pdf_file, caption=f"📧 {email_data['Subject']}")
         
         os.remove(pdf_path)
     except Exception as e:
-        logging.error(f"Error handling email_read command: {e}")
-        bot.send_message(message.from_user.id, _('email_read_error'))
+        logging.error(f"Error in email_read: {e}")
+        user_id = message.from_user.id if isinstance(message, telebot.types.Message) else message.from_user.id
+        bot.send_message(user_id, _('email_read_error'))

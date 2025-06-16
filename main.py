@@ -361,5 +361,21 @@ def handle_task_done(message):
     
     task_done(message, bot)
 
+#########################
+#                       #
+#       CALLBACKS       #
+#                       #
+#########################
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('email_read_'))
+def email_read_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    
+    email_read(call, bot)
+
+
+    
 if __name__ == '__main__':
     main()
