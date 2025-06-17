@@ -105,6 +105,14 @@ messages = {
     "file_deleted": "Файл удален", 
     "file_shared": "Файл перемещен в общедоступные файлы",
     "file_not_found": "Файл не найден",
+    "files_list_empty": "Список файлов пуст",
+    "files_list_title": "Список файлов",
+    "private_files_title": "Личные файлы",
+    "public_files_title": "Общедоступные файлы",
+    "prev_page": "Назад",
+    "next_page": "Вперед",
+    "page": "Страница",
+    "of": "из",
 
     # Уведомления
     "notification_alert": "Внимание! Новое уведомление!",

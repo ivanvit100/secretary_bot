@@ -105,6 +105,14 @@ messages = {
     "file_deleted": "File deleted",
     "file_shared": "File moved to public files",
     "file_not_found": "File not found",
+    "files_list_empty": "File list is empty",
+    "files_list_title": "File List",
+    "private_files_title": "Private Files",
+    "public_files_title": "Public Files", 
+    "prev_page": "Previous",
+    "next_page": "Next",
+    "page": "Page",
+    "of": "of",
 
     # Notifications
     "notification_alert": "Attention! New notification!",

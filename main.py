@@ -374,8 +374,29 @@ def email_read_callback(call):
     bot.send_chat_action(call.message.chat.id, 'typing')
     
     email_read(call, bot)
-
-
     
+@bot.callback_query_handler(func=lambda call: call.data.startswith('file_page_'))
+def file_page_callback(call):
+    # Для публичных файлов не требуется авторизация
+    parts = call.data.split('_')
+    type_flag = int(parts[2])
+    
+    if type_flag == 1 and not check(call.from_user.id):  # Проверяем только для личных файлов
+        return
+    
+    show_files(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('file_download_'))
+def file_download_callback(call):
+    # Для публичных файлов не требуется авторизация
+    parts = call.data.split('_')
+    type_flag = int(parts[2])
+    
+    if type_flag == 1 and not check(call.from_user.id):  # Проверяем только для личных файлов
+        return
+    
+    download_file(call, bot)
+    
+
 if __name__ == '__main__':
     main()
