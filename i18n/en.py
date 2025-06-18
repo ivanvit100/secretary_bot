@@ -162,6 +162,13 @@ messages = {
     "task_added": "Task added",
     "task_not_found": "Task not found",
     "task_index_required": "Task index is required",
+    "task_button_complete": "✅ Complete",
+    "task_button_delete": "❌ Delete",
+    "task_button_back": "⬅️ Back to list",
+    "task_completed_short": "Task completed!",
+    "task_deleted_short": "Task deleted!",
+    "task_completed_message": "✅ Task `{task}` marked as completed",
+    "task_deleted_message": "❌ Task `{task}` deleted",
 
     # VPS statistics
     "vps_info_title": "VPS Information",

@@ -162,6 +162,13 @@ messages = {
     "task_added": "Задача добавлена",
     "task_not_found": "Задача не найдена",
     "task_index_required": "Необходимо указать индекс задачи",
+    "task_button_complete": "✅ Выполнить",
+    "task_button_delete": "❌ Удалить",
+    "task_button_back": "⬅️ Назад к списку",
+    "task_completed_short": "Задача выполнена!",
+    "task_deleted_short": "Задача удалена!",
+    "task_completed_message": "✅ Задача `{task}` отмечена как выполненная",
+    "task_deleted_message": "❌ Задача `{task}` удалена",
 
     # VPS статистика
     "vps_info_title": "Информация о VPS",

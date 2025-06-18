@@ -103,7 +103,7 @@ def main():
     
     while True:
         try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
+            bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as e:
             logging.error(f"Ошибка: {e}")
             time.sleep(15)
@@ -377,25 +377,75 @@ def email_read_callback(call):
     
 @bot.callback_query_handler(func=lambda call: call.data.startswith('file_page_'))
 def file_page_callback(call):
-    # Для публичных файлов не требуется авторизация
     parts = call.data.split('_')
     type_flag = int(parts[2])
     
-    if type_flag == 1 and not check(call.from_user.id):  # Проверяем только для личных файлов
+    if type_flag == 1 and not check(call.from_user.id):
         return
     
     show_files(call, bot)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('file_download_'))
 def file_download_callback(call):
-    # Для публичных файлов не требуется авторизация
     parts = call.data.split('_')
     type_flag = int(parts[2])
     
-    if type_flag == 1 and not check(call.from_user.id):  # Проверяем только для личных файлов
+    if type_flag == 1 and not check(call.from_user.id):
         return
     
     download_file(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('task_view_'))
+def task_view_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    task_view(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('task_done_'))
+def task_complete_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    task_done_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('task_delete_'))
+def task_remove_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    task_delete_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'task_list')
+def task_list_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    bot.answer_callback_query(call.id)
+    
+    data = read_json()
+    tasks = data.get('tasks', [])
+    
+    if not tasks:
+        bot.edit_message_text(_('task_none'), call.message.chat.id, call.message.message_id)
+        return
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    for index, task in enumerate(tasks):
+        button_text = f"📝 {task['title']}"
+        markup.add(types.InlineKeyboardButton(
+            button_text, 
+            callback_data=f"task_view_{index}"
+        ))
+
+    bot.edit_message_text(
+        f'*{_("task_list_title")}*', 
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown',
+        reply_markup=markup
+    )
     
 
 if __name__ == '__main__':

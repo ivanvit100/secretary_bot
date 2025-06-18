@@ -72,8 +72,7 @@ def mounth_plot(data: dict):
         width = .45
 
         x = np.arange(31)
-
-        _, ax = plt.subplots(figsize=(10, 5))
+        fig, ax = plt.subplots(figsize=(10, 5))
 
         ax.bar(x - width / 2, incomes, width, label=_('plot_income_legend'))
         ax.bar(x + width / 2, expenses, width, label=_('plot_expenses_legend'))
@@ -85,7 +84,7 @@ def mounth_plot(data: dict):
         ax.grid(True)
 
         plt.savefig('mounth_plot.png')
-        plt.close()
+        plt.close(fig)
         logging.info(_("plot_month_saved"))
     except Exception as e:
         logging.error(f"Error in mounth_plot: {e}")
