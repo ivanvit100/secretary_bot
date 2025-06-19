@@ -2,6 +2,7 @@ import datetime
 import telebot
 import logging
 import os
+import math
 from dotenv import load_dotenv
 from threading import Timer
 from telebot import types
@@ -55,23 +56,56 @@ def cancel_scheduled_message(index: int):
         logging.warning(i18n._("notification_invalid_index", index=index))
         return False
 
-def schedule_list(bot: telebot.TeleBot):
+def schedule_list(bot: telebot.TeleBot, page: int = 0):
     if scheduled_jobs:
+        notifications_per_page = 8
+        total_pages = max(1, math.ceil(len(scheduled_jobs) / notifications_per_page))
+        
+        if page < 0:
+            page = 0
+        elif page >= total_pages:
+            page = total_pages - 1
+        
+        start_idx = page * notifications_per_page
+        end_idx = min(start_idx + notifications_per_page, len(scheduled_jobs))
+        current_page_notifications = scheduled_jobs[start_idx:end_idx]
+        
         markup = types.InlineKeyboardMarkup(row_width=1)
         
-        for index, job in enumerate(scheduled_jobs):
+        for idx, job in enumerate(current_page_notifications):
+            absolute_idx = start_idx + idx
             run_at, message_text = job[0], job[1]
             display_text = message_text[:30] + "..." if len(message_text) > 30 else message_text
             button_text = f"🔔 {run_at} - {display_text}"
             
             markup.add(types.InlineKeyboardButton(
                 button_text, 
-                callback_data=f"notification_view_{index}"
+                callback_data=f"notification_view_{absolute_idx}"
             ))
+        
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(types.InlineKeyboardButton(
+                i18n._('prev_page'), 
+                callback_data=f"notification_page_{page-1}"
+            ))
+        
+        if page < total_pages - 1:
+            nav_buttons.append(types.InlineKeyboardButton(
+                i18n._('next_page'),
+                callback_data=f"notification_page_{page+1}"
+            ))
+        
+        if nav_buttons:
+            markup.row(*nav_buttons)
+        
+        message_text = f"*{i18n._('notification_list_title')}*"
+        if total_pages > 1:
+            message_text += f"\n_{i18n._('page')} {page + 1} {i18n._('of')} {total_pages}_"
         
         bot.send_message(
             USER_ID,
-            f"*{i18n._('notification_list_title')}*", 
+            message_text, 
             parse_mode="Markdown",
             reply_markup=markup
         )
@@ -137,33 +171,16 @@ def notification_cancel(call, bot: telebot.TeleBot):
             cancel_scheduled_message(notification_index)
             
             if scheduled_jobs:
-                markup = types.InlineKeyboardMarkup(row_width=1)
-                
-                for index, job in enumerate(scheduled_jobs):
-                    job_run_at, job_message = job[0], job[1]
-                    display_text = job_message[:30] + "..." if len(job_message) > 30 else job_message
-                    button_text = f"🔔 {job_run_at} - {display_text}"
-                    
-                    markup.add(types.InlineKeyboardButton(
-                        button_text, 
-                        callback_data=f"notification_view_{index}"
-                    ))
-                
-                bot.edit_message_text(
-                    f"*{i18n._('notification_list_title')}*\n\n{i18n._('notification_cancelled_message', time=run_at)}",
-                    call.message.chat.id,
-                    call.message.message_id,
-                    parse_mode='Markdown',
-                    reply_markup=markup
-                )
+                notification_list_callback(call, bot, 0)
+                bot.answer_callback_query(call.id, i18n._('notification_cancelled_short'))
             else:
                 bot.edit_message_text(
                     i18n._('notification_list_empty'),
                     call.message.chat.id,
                     call.message.message_id,
-                    parse_mode='Markdown',
+                    parse_mode='Markdown'
                 )
-            bot.answer_callback_query(call.id, i18n._('notification_cancelled_short'))
+                bot.answer_callback_query(call.id, i18n._('notification_cancelled_short'))
         else:
             bot.answer_callback_query(call.id, i18n._('notification_not_found'))
             
@@ -171,25 +188,58 @@ def notification_cancel(call, bot: telebot.TeleBot):
         logging.error(f"Error in notification_cancel: {e}")
         bot.answer_callback_query(call.id, i18n._('notification_error'))
 
-def notification_list_callback(call, bot: telebot.TeleBot):
+def notification_list_callback(call, bot: telebot.TeleBot, page: int = 0):
     try:
         bot.answer_callback_query(call.id)
         
         if scheduled_jobs:
+            notifications_per_page = 8
+            total_pages = max(1, math.ceil(len(scheduled_jobs) / notifications_per_page))
+            
+            if page < 0:
+                page = 0
+            elif page >= total_pages:
+                page = total_pages - 1
+            
+            start_idx = page * notifications_per_page
+            end_idx = min(start_idx + notifications_per_page, len(scheduled_jobs))
+            current_page_notifications = scheduled_jobs[start_idx:end_idx]
+            
             markup = types.InlineKeyboardMarkup(row_width=1)
             
-            for index, job in enumerate(scheduled_jobs):
+            for idx, job in enumerate(current_page_notifications):
+                absolute_idx = start_idx + idx
                 run_at, message_text = job[0], job[1]
                 display_text = message_text[:30] + "..." if len(message_text) > 30 else message_text
                 button_text = f"🔔 {run_at} - {display_text}"
                 
                 markup.add(types.InlineKeyboardButton(
                     button_text, 
-                    callback_data=f"notification_view_{index}"
+                    callback_data=f"notification_view_{absolute_idx}"
                 ))
             
+            nav_buttons = []
+            if page > 0:
+                nav_buttons.append(types.InlineKeyboardButton(
+                    i18n._('prev_page'), 
+                    callback_data=f"notification_page_{page-1}"
+                ))
+            
+            if page < total_pages - 1:
+                nav_buttons.append(types.InlineKeyboardButton(
+                    i18n._('next_page'),
+                    callback_data=f"notification_page_{page+1}"
+                ))
+            
+            if nav_buttons:
+                markup.row(*nav_buttons)
+            
+            message_text = f"*{i18n._('notification_list_title')}*"
+            if total_pages > 1:
+                message_text += f"\n_{i18n._('page')} {page + 1} {i18n._('of')} {total_pages}_"
+            
             bot.edit_message_text(
-                f"*{i18n._('notification_list_title')}*",
+                message_text,
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
@@ -200,11 +250,19 @@ def notification_list_callback(call, bot: telebot.TeleBot):
                 i18n._('notification_list_empty'),
                 call.message.chat.id,
                 call.message.message_id,
-                parse_mode='Markdown',
+                parse_mode='Markdown'
             )
             
     except Exception as e:
         logging.error(f"Error in notification_list_callback: {e}")
+        bot.answer_callback_query(call.id, i18n._('notification_error'))
+
+def notification_page_callback(call, bot: telebot.TeleBot):
+    try:
+        page = int(call.data.split('_')[2])
+        notification_list_callback(call, bot, page)
+    except Exception as e:
+        logging.error(f"Error in notification_page_callback: {e}")
         bot.answer_callback_query(call.id, i18n._('notification_error'))
 
 def start_notification_add(message: telebot.types.Message, bot: telebot.TeleBot):
@@ -372,7 +430,7 @@ def handle_calendar_callback(call, bot: telebot.TeleBot):
             i18n._('notification_cancelled_message'),
             call.message.chat.id,
             call.message.message_id,
-            parse_mode='Markdown',
+            parse_mode='Markdown'
         )
         bot.answer_callback_query(call.id)
         return
@@ -406,7 +464,6 @@ def handle_calendar_callback(call, bot: telebot.TeleBot):
         bot.edit_message_reply_markup(
             call.message.chat.id,
             call.message.message_id,
-            parse_mode='Markdown',
             reply_markup=create_calendar(year, month)
         )
         bot.answer_callback_query(call.id)
@@ -547,14 +604,14 @@ def handle_notification_confirm(call, bot: telebot.TeleBot):
                 i18n._('notification_created_success', date=date, time=time),
                 call.message.chat.id,
                 call.message.message_id,
-                parse_mode='Markdown',
+                parse_mode='Markdown'
             )
         else:
             bot.edit_message_text(
                 i18n._('notification_creation_failed'),
                 call.message.chat.id,
                 call.message.message_id,
-                parse_mode='Markdown',
+                parse_mode='Markdown'
             )
         
         del user_states[user_id]

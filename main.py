@@ -510,6 +510,27 @@ def notification_text_handler(message):
         return
     handle_notification_message(message, bot)
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('notification_page_'))
+def notification_page_callback_handler(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    notification_page_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('task_page_'))
+def task_page_callback_handler(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    task_page_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'task_list')
+def task_list_callback_handler(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    task_list_callback(call, bot)
+    
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@ import telebot
 import logging
 import json
 import os
+import math
 from telebot import types
 from i18n import _
 
@@ -15,7 +16,7 @@ def read_json():
         logging.error(f'Error reading tasks: {e}')
         return {"tasks": [], "complete": 0}
 
-def tasks_list(message: telebot.types.Message, bot: telebot.TeleBot):
+def tasks_list(message: telebot.types.Message, bot: telebot.TeleBot, page: int = 0):
     data = read_json()
     tasks = data.get('tasks', [])
     
@@ -23,23 +24,56 @@ def tasks_list(message: telebot.types.Message, bot: telebot.TeleBot):
         bot.send_message(message.from_user.id, _('task_none'))
         return
 
+    tasks_per_page = 8
+    total_pages = max(1, math.ceil(len(tasks) / tasks_per_page))
+    
+    if page < 0:
+        page = 0
+    elif page >= total_pages:
+        page = total_pages - 1
+    
+    start_idx = page * tasks_per_page
+    end_idx = min(start_idx + tasks_per_page, len(tasks))
+    current_page_tasks = tasks[start_idx:end_idx]
+
     markup = types.InlineKeyboardMarkup(row_width=1)
     
-    for index, task in enumerate(tasks):
+    for idx, task in enumerate(current_page_tasks):
+        absolute_idx = start_idx + idx
         button_text = f"📝 {task['title']}"
         markup.add(types.InlineKeyboardButton(
             button_text, 
-            callback_data=f"task_view_{index}"
+            callback_data=f"task_view_{absolute_idx}"
         ))
+    
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(types.InlineKeyboardButton(
+            _('prev_page'), 
+            callback_data=f"task_page_{page-1}"
+        ))
+    
+    if page < total_pages - 1:
+        nav_buttons.append(types.InlineKeyboardButton(
+            _('next_page'),
+            callback_data=f"task_page_{page+1}"
+        ))
+    
+    if nav_buttons:
+        markup.row(*nav_buttons)
+    
+    message_text = f'*{_("task_list_title")}*'
+    if total_pages > 1:
+        message_text += f"\n_{_('page')} {page + 1} {_('of')} {total_pages}_"
 
     bot.send_message(
         message.from_user.id, 
-        f'*{_("task_list_title")}*', 
+        message_text, 
         parse_mode='Markdown',
         reply_markup=markup
     )
 
-def edit_tasks_list(message_id: int, chat_id: int, bot: telebot.TeleBot):
+def edit_tasks_list(message_id: int, chat_id: int, bot: telebot.TeleBot, page: int = 0):
     data = read_json()
     tasks = data.get('tasks', [])
     
@@ -47,17 +81,50 @@ def edit_tasks_list(message_id: int, chat_id: int, bot: telebot.TeleBot):
         bot.edit_message_text(_('task_none'), chat_id, message_id)
         return
 
+    tasks_per_page = 8
+    total_pages = max(1, math.ceil(len(tasks) / tasks_per_page))
+    
+    if page < 0:
+        page = 0
+    elif page >= total_pages:
+        page = total_pages - 1
+    
+    start_idx = page * tasks_per_page
+    end_idx = min(start_idx + tasks_per_page, len(tasks))
+    current_page_tasks = tasks[start_idx:end_idx]
+
     markup = types.InlineKeyboardMarkup(row_width=1)
     
-    for index, task in enumerate(tasks):
+    for idx, task in enumerate(current_page_tasks):
+        absolute_idx = start_idx + idx
         button_text = f"📝 {task['title']}"
         markup.add(types.InlineKeyboardButton(
             button_text, 
-            callback_data=f"task_view_{index}"
+            callback_data=f"task_view_{absolute_idx}"
         ))
+    
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(types.InlineKeyboardButton(
+            _('prev_page'), 
+            callback_data=f"task_page_{page-1}"
+        ))
+    
+    if page < total_pages - 1:
+        nav_buttons.append(types.InlineKeyboardButton(
+            _('next_page'),
+            callback_data=f"task_page_{page+1}"
+        ))
+    
+    if nav_buttons:
+        markup.row(*nav_buttons)
+    
+    message_text = f'*{_("task_list_title")}*'
+    if total_pages > 1:
+        message_text += f"\n_{_('page')} {page + 1} {_('of')} {total_pages}_"
 
     bot.edit_message_text(
-        f'*{_("task_list_title")}*', 
+        message_text, 
         chat_id,
         message_id,
         parse_mode='Markdown',
@@ -125,22 +192,12 @@ def task_delete_callback(call, bot: telebot.TeleBot):
         
         bot.answer_callback_query(call.id, _('task_deleted_short'))
         
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        
-        for index, task_item in enumerate(tasks):
-            button_text = f"📝 {task_item['title']}"
-            markup.add(types.InlineKeyboardButton(
-                button_text, 
-                callback_data=f"task_view_{index}"
-            ))
-        
         if tasks:
-            bot.edit_message_text(
-                f'*{_("task_list_title")}*\n\n{_("task_deleted_message", task=task)}',
-                call.message.chat.id,
+            edit_tasks_list(
                 call.message.message_id,
-                parse_mode='Markdown',
-                reply_markup=markup
+                call.message.chat.id,
+                bot,
+                0
             )
         else:
             bot.edit_message_text(
@@ -171,22 +228,12 @@ def task_done_callback(call, bot: telebot.TeleBot):
         
         bot.answer_callback_query(call.id, _('task_completed_short'))
         
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        
-        for index, task_item in enumerate(tasks):
-            button_text = f"📝 {task_item['title']}"
-            markup.add(types.InlineKeyboardButton(
-                button_text, 
-                callback_data=f"task_view_{index}"
-            ))
-        
         if tasks:
-            bot.edit_message_text(
-                f'*{_("task_list_title")}*\n\n{_("task_completed_message", task=task)}',
-                call.message.chat.id,
+            edit_tasks_list(
                 call.message.message_id,
-                parse_mode='Markdown',
-                reply_markup=markup
+                call.message.chat.id,
+                bot,
+                0
             )
         else:
             bot.edit_message_text(
@@ -196,6 +243,23 @@ def task_done_callback(call, bot: telebot.TeleBot):
             )
     except Exception as e:
         logging.error(f'Error in task_done_callback: {e}')
+        bot.answer_callback_query(call.id, _('task_error'))
+
+def task_page_callback(call, bot: telebot.TeleBot):
+    try:
+        page = int(call.data.split('_')[2])
+        edit_tasks_list(call.message.message_id, call.message.chat.id, bot, page)
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        logging.error(f'Error in task_page_callback: {e}')
+        bot.answer_callback_query(call.id, _('task_error'))
+
+def task_list_callback(call, bot: telebot.TeleBot):
+    try:
+        bot.answer_callback_query(call.id)
+        edit_tasks_list(call.message.message_id, call.message.chat.id, bot)
+    except Exception as e:
+        logging.error(f'Error in task_list_callback: {e}')
         bot.answer_callback_query(call.id, _('task_error'))
 
 def task_delete(message: telebot.types.Message, bot: telebot.TeleBot):
