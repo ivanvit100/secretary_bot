@@ -29,15 +29,21 @@ class NotificationData:
         self.message = None
         self.orig_message_id = None
 
-def send_delayed_message(message: str, bot: telebot.TeleBot):
+def send_delayed_message(message: str, run_at: str, bot: telebot.TeleBot):
     bot.send_message(USER_ID, f'*{i18n._("notification_alert")}*\n\n{message}', parse_mode="Markdown")
+    
+    for i, job in enumerate(scheduled_jobs[:]):
+        if job[0] == run_at and job[1] == message:
+            del scheduled_jobs[i]
+            logging.info(f"Notification automatically removed after delivery: {run_at}")
+            break
 
 def schedule_message(message: str, run_at: str, bot: telebot.TeleBot):
     run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
     delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3)).total_seconds()
     
     if delay > 0:
-        timer = Timer(delay, send_delayed_message, [message, bot])
+        timer = Timer(delay, send_delayed_message, [message, run_at, bot])
         scheduled_jobs.append((run_at, message, timer))
         timer.start()
         logging.info(i18n._("notification_scheduled", time=run_at))
