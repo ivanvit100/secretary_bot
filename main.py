@@ -361,6 +361,13 @@ def handle_task_done(message):
     
     task_done(message, bot)
 
+@bot.message_handler(commands=['notification_add'])
+def notification_add_command(message):
+    if not check(message.from_user.id):
+        return
+    bot.send_chat_action(message.chat.id, 'typing')
+    start_notification_add(message, bot)
+
 #########################
 #                       #
 #       CALLBACKS       #
@@ -446,7 +453,64 @@ def task_list_callback(call):
         parse_mode='Markdown',
         reply_markup=markup
     )
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('notification_view_'))
+def notification_view_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    notification_view(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('notification_cancel_'))
+def notification_cancel_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    notification_cancel(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'notification_list')
+def notification_list_callback_handler(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    notification_list_callback(call, bot)    
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('calendar_'))
+def calendar_callback(call):
+    if not check(call.from_user.id):
+        return
+    handle_calendar_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('time_') or call.data.startswith('notification_back_to_'))
+def time_callback(call):
+    if not check(call.from_user.id):
+        return
+    handle_time_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'notification_cancel')
+def notification_cancel_create_callback(call):
+    if not check(call.from_user.id):
+        return
     
+    if call.from_user.id in user_states:
+        del user_states[call.from_user.id]
+        
+    bot.edit_message_text(_('notification_cancelled_message'), call.message.chat.id, call.message.message_id)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'notification_confirm')
+def notification_confirm_callback(call):
+    if not check(call.from_user.id):
+        return
+    handle_notification_confirm(call, bot)
+
+@bot.message_handler(func=lambda message: message.from_user.id in user_states and user_states[message.from_user.id]['state'] == NotificationStates.WAITING_FOR_MESSAGE)
+def notification_text_handler(message):
+    if not check(message.from_user.id):
+        return
+    handle_notification_message(message, bot)
+
+
 
 if __name__ == '__main__':
     main()
