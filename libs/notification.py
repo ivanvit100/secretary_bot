@@ -1,6 +1,7 @@
 import datetime
 import telebot
 import logging
+import config
 import os
 import math
 from dotenv import load_dotenv
@@ -40,7 +41,7 @@ def send_delayed_message(message: str, run_at: str, bot: telebot.TeleBot):
 
 def schedule_message(message: str, run_at: str, bot: telebot.TeleBot):
     run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
-    delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3)).total_seconds()
+    delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3 - config.UTC)).total_seconds()
     
     if delay > 0:
         timer = Timer(delay, send_delayed_message, [message, run_at, bot])

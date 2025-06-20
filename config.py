@@ -1,6 +1,17 @@
 LANGUAGE = "ru"
 AVAILABLE_LANGUAGES = ["ru", "en"]
 NAME = "Иванущенко Виталия"
+UTC = 3
+MODULES = {
+    "balance": True,
+    "email": True,
+    "files": True,
+    "notification": True,
+    "plots": True,
+    "support": True,
+    "task": True,
+    "vps": True
+}
 
 def set_language(lang_code):
     global LANGUAGE

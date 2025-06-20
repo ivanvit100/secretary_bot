@@ -92,7 +92,8 @@ def main():
         
     everyday_job()
     
-    schedule.every().day.at("03:00").do(everyday_job)
+    report_time = (0 + config.UTC) % 24
+    schedule.every().day.at(f"{report_time:02d}:00").do(everyday_job)
     
     scheduler_thread = threading.Thread(target=schedule_checker)
     scheduler_thread.daemon = True
