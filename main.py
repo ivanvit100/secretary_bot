@@ -368,6 +368,18 @@ def notification_add_command(message):
     bot.send_chat_action(message.chat.id, 'typing')
     start_notification_add(message, bot)
 
+@bot.message_handler(func=lambda message: message.from_user.id in task_states and task_states[message.from_user.id]['state'] == TaskStates.WAITING_FOR_TITLE)
+def task_title_handler(message):
+    if not check(message.from_user.id):
+        return
+    handle_task_title(message, bot)
+
+@bot.message_handler(func=lambda message: message.from_user.id in task_states and task_states[message.from_user.id]['state'] == TaskStates.WAITING_FOR_DESCRIPTION)
+def task_description_handler(message):
+    if not check(message.from_user.id):
+        return
+    handle_task_description(message, bot)
+
 #########################
 #                       #
 #       CALLBACKS       #
@@ -530,6 +542,27 @@ def task_list_callback_handler(call):
         return
     bot.send_chat_action(call.message.chat.id, 'typing')
     task_list_callback(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'task_add')
+def task_add_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    start_task_add(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'task_add_confirm')
+def task_add_confirm_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    handle_task_add_confirm(call, bot)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'task_add_cancel')
+def task_add_cancel_callback(call):
+    if not check(call.from_user.id):
+        return
+    bot.send_chat_action(call.message.chat.id, 'typing')
+    handle_task_add_cancel(call, bot)
     
 
 

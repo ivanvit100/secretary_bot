@@ -8,6 +8,20 @@ from i18n import _
 
 FILE_PATH = f'{os.path.dirname(os.path.dirname(__file__))}/data/tasks.json'
 
+task_states = {}
+
+class TaskStates:
+    IDLE = 0
+    WAITING_FOR_TITLE = 1
+    WAITING_FOR_DESCRIPTION = 2
+    CONFIRMATION = 3
+
+class TaskData:
+    def __init__(self):
+        self.title = None
+        self.description = None
+        self.orig_message_id = None
+
 def read_json():
     try:
         with open(FILE_PATH, 'r') as file:
@@ -21,7 +35,18 @@ def tasks_list(message: telebot.types.Message, bot: telebot.TeleBot, page: int =
     tasks = data.get('tasks', [])
     
     if not tasks:
-        bot.send_message(message.from_user.id, _('task_none'))
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton(
+            _('task_button_add'), 
+            callback_data="task_add"
+        ))
+        
+        bot.send_message(
+            message.from_user.id, 
+            _('task_none'),
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
         return
 
     tasks_per_page = 8
@@ -58,6 +83,11 @@ def tasks_list(message: telebot.types.Message, bot: telebot.TeleBot, page: int =
             _('next_page'),
             callback_data=f"task_page_{page+1}"
         ))
+    
+    markup.add(types.InlineKeyboardButton(
+        _('task_button_add'), 
+        callback_data="task_add"
+    ))
     
     if nav_buttons:
         markup.row(*nav_buttons)
@@ -78,7 +108,19 @@ def edit_tasks_list(message_id: int, chat_id: int, bot: telebot.TeleBot, page: i
     tasks = data.get('tasks', [])
     
     if not tasks:
-        bot.edit_message_text(_('task_none'), chat_id, message_id)
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(types.InlineKeyboardButton(
+            _('task_button_add'), 
+            callback_data="task_add"
+        ))
+        
+        bot.edit_message_text(
+            _('task_none'),
+            chat_id,
+            message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
         return
 
     tasks_per_page = 8
@@ -115,6 +157,11 @@ def edit_tasks_list(message_id: int, chat_id: int, bot: telebot.TeleBot, page: i
             _('next_page'),
             callback_data=f"task_page_{page+1}"
         ))
+    
+    markup.add(types.InlineKeyboardButton(
+        _('task_button_add'), 
+        callback_data="task_add"
+    ))
     
     if nav_buttons:
         markup.row(*nav_buttons)
@@ -200,10 +247,10 @@ def task_delete_callback(call, bot: telebot.TeleBot):
                 0
             )
         else:
-            bot.edit_message_text(
-                _('task_none'),
+            edit_tasks_list(
+                call.message.message_id,
                 call.message.chat.id,
-                call.message.message_id
+                bot
             )
     except Exception as e:
         logging.error(f'Error in task_delete_callback: {e}')
@@ -236,10 +283,10 @@ def task_done_callback(call, bot: telebot.TeleBot):
                 0
             )
         else:
-            bot.edit_message_text(
-                _('task_none'),
+            edit_tasks_list(
+                call.message.message_id,
                 call.message.chat.id,
-                call.message.message_id
+                bot
             )
     except Exception as e:
         logging.error(f'Error in task_done_callback: {e}')
@@ -335,3 +382,161 @@ def task_add(message: telebot.types.Message, bot: telebot.TeleBot):
     except Exception as e:
         logging.error(f'Error adding task: {e}')
         bot.send_message(message.from_user.id, _('task_error'))
+
+def start_task_add(message_or_call, bot: telebot.TeleBot):
+    if isinstance(message_or_call, types.CallbackQuery):
+        user_id = message_or_call.from_user.id
+        chat_id = message_or_call.message.chat.id
+        bot.answer_callback_query(message_or_call.id)
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(_('task_button_cancel'), callback_data="task_add_cancel"))
+        
+        sent_msg = bot.edit_message_text(
+            _('task_enter_title'),
+            chat_id,
+            message_or_call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        message_id = message_or_call.message.message_id
+    else:
+        user_id = message_or_call.from_user.id
+        chat_id = message_or_call.chat.id
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(_('task_button_cancel'), callback_data="task_add_cancel"))
+        
+        sent_msg = bot.send_message(
+            chat_id,
+            _('task_enter_title'),
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        message_id = sent_msg.message_id
+    
+    task_states[user_id] = {
+        'state': TaskStates.WAITING_FOR_TITLE,
+        'data': TaskData(),
+        'message_id': message_id
+    }
+
+def handle_task_title(message, bot: telebot.TeleBot):
+    user_id = message.from_user.id
+    
+    if user_id in task_states and task_states[user_id]['state'] == TaskStates.WAITING_FOR_TITLE:
+        task_states[user_id]['data'].title = message.text
+        task_states[user_id]['state'] = TaskStates.WAITING_FOR_DESCRIPTION
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(_('task_button_cancel'), callback_data="task_add_cancel"))
+        
+        bot.delete_message(
+            message.chat.id,
+            task_states[user_id]['message_id']
+        )
+        
+        sent_msg = bot.send_message(
+            message.chat.id,
+            _('task_title_selected', title=task_states[user_id]['data'].title) + "\n\n" + _('task_enter_description'),
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        
+        task_states[user_id]['message_id'] = sent_msg.message_id
+        bot.delete_message(message.chat.id, message.message_id)
+
+def handle_task_description(message, bot: telebot.TeleBot):
+    user_id = message.from_user.id
+    
+    if user_id in task_states and task_states[user_id]['state'] == TaskStates.WAITING_FOR_DESCRIPTION:
+        task_states[user_id]['data'].description = message.text
+        task_states[user_id]['state'] = TaskStates.CONFIRMATION
+        
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            types.InlineKeyboardButton(
+                _('task_button_confirm'), 
+                callback_data="task_add_confirm"
+            ),
+            types.InlineKeyboardButton(
+                _('task_button_cancel'), 
+                callback_data="task_add_cancel"
+            )
+        )
+        
+        title = task_states[user_id]['data'].title
+        description = task_states[user_id]['data'].description
+        
+        preview_text = (
+            f"*{_('task_preview')}*\n\n"
+            f"{_('task_preview_title')}: *{title}*\n\n"
+            f"{_('task_preview_description')}:\n{description}\n\n"
+            f"{_('task_confirm_prompt')}"
+        )
+        
+        bot.delete_message(
+            message.chat.id,
+            task_states[user_id]['message_id']
+        )
+        
+        sent_msg = bot.send_message(
+            message.chat.id,
+            preview_text,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        
+        task_states[user_id]['message_id'] = sent_msg.message_id
+        bot.delete_message(message.chat.id, message.message_id)
+
+def handle_task_add_confirm(call, bot: telebot.TeleBot):
+    user_id = call.from_user.id
+    
+    if user_id in task_states and task_states[user_id]['state'] == TaskStates.CONFIRMATION:
+        title = task_states[user_id]['data'].title
+        description = task_states[user_id]['data'].description
+        
+        try:
+            data = read_json()
+            data["tasks"].append({
+                "title": title,
+                "description": description
+            })
+
+            with open(FILE_PATH, 'w', encoding='utf-8') as file:
+                json.dump(data, file, indent=4, ensure_ascii=False)
+
+            bot.edit_message_text(
+                _('task_added_success'),
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode='Markdown'
+            )
+            
+            del task_states[user_id]
+            bot.answer_callback_query(call.id, _('task_added_short'))
+            
+        except Exception as e:
+            logging.error(f'Error adding task: {e}')
+            bot.edit_message_text(
+                _('task_error'),
+                call.message.chat.id,
+                call.message.message_id
+            )
+            bot.answer_callback_query(call.id, _('task_error'))
+            del task_states[user_id]
+
+def handle_task_add_cancel(call, bot: telebot.TeleBot):
+    user_id = call.from_user.id
+    
+    if user_id in task_states:
+        del task_states[user_id]
+        
+    bot.edit_message_text(
+        _('task_add_cancelled'),
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown'
+    )
+    bot.answer_callback_query(call.id)
