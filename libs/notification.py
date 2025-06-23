@@ -431,8 +431,16 @@ def create_minute_picker(hour):
 def handle_calendar_callback(call, bot: telebot.TeleBot):
     user_id = call.from_user.id
     
+    if user_id not in user_states:
+        user_states[user_id] = {
+            'state': NotificationStates.WAITING_FOR_DATE,
+            'data': NotificationData()
+        }
+        user_states[user_id]['data'].orig_message_id = call.message.message_id
+    
     if call.data == "notification_cancel":
-        del user_states[user_id]
+        if user_id in user_states:
+            del user_states[user_id]
         bot.edit_message_text(
             i18n._('notification_cancelled_message'),
             call.message.chat.id,
@@ -482,6 +490,10 @@ def handle_calendar_callback(call, bot: telebot.TeleBot):
 
 def handle_time_callback(call, bot: telebot.TeleBot):
     user_id = call.from_user.id
+
+    if user_id not in user_states:
+        bot.answer_callback_query(call.id, i18n._('notification_session_expired'))
+        return
     
     if call.data == "notification_back_to_date":
         user_states[user_id]['state'] = NotificationStates.WAITING_FOR_DATE
@@ -578,10 +590,14 @@ def handle_notification_message(message, bot: telebot.TeleBot):
             f"{i18n._('notification_confirm_prompt')}"
         )
         
-        bot.delete_message(
-            message.chat.id,
-            user_states[user_id]['message_id']
-        )
+        if 'message_id' in user_states[user_id]:
+            try:
+                bot.delete_message(
+                    message.chat.id,
+                    user_states[user_id]['message_id']
+                )
+            except Exception as e:
+                logging.error(f"Error deleting message: {e}")
         
         sent_msg = bot.send_message(
             message.chat.id,
@@ -592,7 +608,10 @@ def handle_notification_message(message, bot: telebot.TeleBot):
         
         user_states[user_id]['message_id'] = sent_msg.message_id
         
-        bot.delete_message(message.chat.id, message.message_id)
+        try:
+            bot.delete_message(message.chat.id, message.message_id)
+        except Exception as e:
+            logging.error(f"Error deleting user message: {e}")
 
 def handle_notification_confirm(call, bot: telebot.TeleBot):
     user_id = call.from_user.id
