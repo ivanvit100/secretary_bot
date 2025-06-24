@@ -3,6 +3,10 @@ from telebot import types
 import config
 from i18n import _
 import logging
+from libs.email import (
+    start_email_send, handle_email_confirm_send, 
+    handle_email_cancel, handle_email_attach_files
+)
 
 ssh_mode_users = {}
 
@@ -204,15 +208,16 @@ def handle_menu_callback(call, bot):
                 try:
                     import os
                     email_address = os.getenv('EMAIL_ADDRESS')
-                    
+
                     if ',' in email_address:
                         email_list = [email.strip() for email in email_address.split(',')]
                         markup = types.InlineKeyboardMarkup(row_width=1)
-                        for email in email_list:
-                            markup.add(types.InlineKeyboardButton(f"📧 {email}", callback_data=f"menu_email_select_{email}"))
-                        
+
+                        for idx, email in enumerate(email_list):
+                            markup.add(types.InlineKeyboardButton(f"📧 {email}", callback_data=f"menu_email_select_{idx}_{email}"))
+
                         markup.add(types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main"))
-                        
+
                         bot.edit_message_text(
                             _("menu_email_select_title"),
                             call.message.chat.id,
@@ -223,11 +228,11 @@ def handle_menu_callback(call, bot):
                     else:
                         markup = types.InlineKeyboardMarkup(row_width=1)
                         markup.add(
-                            types.InlineKeyboardButton(_("menu_email_send_button"), callback_data=f"email_send_{email_address}"),
-                            types.InlineKeyboardButton(_("menu_email_read_button"), callback_data=f"email_read_{email_address}"),
+                            types.InlineKeyboardButton(_("menu_email_send_button"), callback_data="menu_email_send_0"),
+                            types.InlineKeyboardButton(_("menu_email_read_button"), callback_data="menu_email_list_0"),
                             types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
                         )
-                        
+
                         bot.edit_message_text(
                             _("menu_email_mailbox_title").format(email=email_address),
                             call.message.chat.id,
@@ -235,18 +240,19 @@ def handle_menu_callback(call, bot):
                             parse_mode="Markdown",
                             reply_markup=markup
                         )
-                        
                 except Exception as e:
                     logging.error(f"Error handling email menu: {e}")
                     bot.send_message(call.message.chat.id, _("menu_email_error").format(error=e))
         elif callback_data.startswith("menu_email_select_"):
             bot.answer_callback_query(call.id)
-            selected_email = callback_data.replace("menu_email_select_", "")
+            parts = callback_data.replace("menu_email_select_", "").split('_', 1)
+            email_idx = int(parts[0])
+            selected_email = parts[1]
 
             markup = types.InlineKeyboardMarkup(row_width=1)
             markup.add(
-                types.InlineKeyboardButton(_("menu_email_send_button"), callback_data=f"email_send_{selected_email}"),
-                types.InlineKeyboardButton(_("menu_email_read_button"), callback_data=f"email_read_{selected_email}"),
+                types.InlineKeyboardButton(_("menu_email_send_button"), callback_data=f"menu_email_send_{email_idx}"),
+                types.InlineKeyboardButton(_("menu_email_read_button"), callback_data=f"menu_email_list_{email_idx}"),
                 types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_email")
             )
 
@@ -257,12 +263,15 @@ def handle_menu_callback(call, bot):
                 parse_mode="Markdown",
                 reply_markup=markup
             )
-        elif callback_data.startswith("email_read_"):
+        # Обрабатываем нажатие кнопки "Входящие"
+        elif callback_data.startswith("menu_email_list_"):
             bot.answer_callback_query(call.id)
             if config.MODULES["email"]:
                 try:
-                    from libs.email import email_read
-                    email_address = callback_data.replace("email_read_", "")
+                    email_index = int(callback_data.replace("menu_email_list_", ""))
+
+                    from libs.email import email_main
+
                     email_message = telebot.types.Message(
                         message_id=call.message.message_id,
                         from_user=call.from_user,
@@ -272,12 +281,92 @@ def handle_menu_callback(call, bot):
                         options={},
                         json_string=''
                     )
-                    email_message.text = f'/email_read_{email_address}'
-
-                    email_read(email_message, bot)
+                    email_message.text = ''
+                    email_main(email_message, bot, 0, email_index)
                 except Exception as e:
-                    logging.error(f"Error reading emails: {e}")
+                    logging.error(f"Error getting email list: {e}")
                     bot.send_message(call.message.chat.id, _("menu_email_read_error").format(error=e))
+        # Обработчик для чтения email
+        elif callback_data.startswith("email_read_"):
+            bot.answer_callback_query(call.id)
+            if config.MODULES["email"]:
+                try:
+                    parts = callback_data.split('_')
+
+                    if len(parts) == 3:
+                        email_index = int(parts[2])
+                        from libs.email import email_main
+
+                        email_message = telebot.types.Message(
+                            message_id=call.message.message_id,
+                            from_user=call.from_user,
+                            date=call.message.date,
+                            chat=call.message.chat,
+                            content_type='text',
+                            options={},
+                            json_string=''
+                        )
+                        email_message.text = f'/email'
+                        email_main(email_message, bot, 0, email_index)
+
+                    elif len(parts) == 4:
+                        email_index = int(parts[2])
+                        message_index = int(parts[3])
+
+                        from libs.email import email_read
+
+                        email_message = telebot.types.Message(
+                            message_id=call.message.message_id,
+                            from_user=call.from_user,
+                            date=call.message.date,
+                            chat=call.message.chat,
+                            content_type='text',
+                            options={},
+                            json_string=''
+                        )
+                        email_message.text = f'/email_read_{email_index}_{message_index}'
+                        email_read(email_message, bot)
+                    else:
+                        message_index = int(parts[2])
+
+                        from libs.email import email_read
+
+                        email_message = telebot.types.Message(
+                            message_id=call.message.message_id,
+                            from_user=call.from_user,
+                            date=call.message.date,
+                            chat=call.message.chat,
+                            content_type='text',
+                            options={},
+                            json_string=''
+                        )
+                        email_message.text = f'/email_read_{message_index}'
+                        email_read(email_message, bot)
+
+                except Exception as e:
+                    logging.error(f"Error processing email action: {e}")
+            bot.send_message(call.message.chat.id, _("menu_email_read_error").format(error=e))
+        # В обработчике меню для кнопок email
+        elif callback_data.startswith("menu_email_send_"):
+            bot.answer_callback_query(call.id)
+            if config.MODULES["email"]:
+                try:
+                    email_idx = int(callback_data.replace("menu_email_send_", ""))
+                    from libs.email import start_email_send
+                    start_email_send(call, bot, email_idx)
+                except Exception as e:
+                    logging.error(f"Error starting email send: {e}")
+                    bot.send_message(call.message.chat.id, _("menu_email_send_error").format(error=e))
+        # Обработчики кнопок для подтверждения email
+        elif callback_data == "email_confirm_send":
+            from libs.email import handle_email_confirm_send
+            handle_email_confirm_send(call, bot)
+        elif callback_data == "email_cancel":
+            from libs.email import handle_email_cancel
+            handle_email_cancel(call, bot)
+        elif callback_data == "email_attach_files":
+            from libs.email import handle_email_attach_files
+            handle_email_attach_files(call, bot)
         
         # Баланс
         elif callback_data == "menu_balance":

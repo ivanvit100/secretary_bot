@@ -272,6 +272,45 @@ if config.MODULES["email"]:
         
         email_read(message, bot)
 
+    @bot.message_handler(
+        func=lambda message: message.from_user.id in libs.email.email_states 
+        and libs.email.email_states[message.from_user.id]['state'] == libs.email.EmailStates.WAITING_FOR_ATTACHMENTS, 
+        content_types=['document']
+    )
+    def email_attachment_handler(message):
+        if not check(message.from_user.id):
+            return
+        libs.email.handle_email_attachments(message, bot)
+
+    @bot.message_handler(func=lambda message: message.from_user.id in libs.email.email_states and libs.email.email_states[message.from_user.id]['state'] == libs.email.EmailStates.WAITING_FOR_RECIPIENT)
+    def email_recipient_handler(message):
+        if not check(message.from_user.id):
+            return
+        libs.email.handle_email_recipient(message, bot)
+
+    @bot.message_handler(func=lambda message: message.from_user.id in libs.email.email_states and libs.email.email_states[message.from_user.id]['state'] == libs.email.EmailStates.WAITING_FOR_SUBJECT)
+    def email_subject_handler(message):
+        if not check(message.from_user.id):
+            return
+        libs.email.handle_email_subject(message, bot)
+
+    @bot.message_handler(func=lambda message: message.from_user.id in libs.email.email_states and libs.email.email_states[message.from_user.id]['state'] == libs.email.EmailStates.WAITING_FOR_BODY)
+    def email_body_handler(message):
+        if not check(message.from_user.id):
+            return
+        libs.email.handle_email_body(message, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data in ["email_confirm_send", "email_cancel", "email_attach_files", "email_attach_more"])
+    def email_actions_callback(call):
+        if not check(call.from_user.id):
+            return
+        if call.data == "email_confirm_send":
+            libs.email.handle_email_confirm_send(call, bot)
+        elif call.data == "email_cancel":
+            libs.email.handle_email_cancel(call, bot)
+        elif call.data in ["email_attach_files", "email_attach_more"]:
+            libs.email.handle_email_attach_files(call, bot)
+
 if config.MODULES["files"]:
     @bot.message_handler(content_types=['document'])
     def save_file(message: telebot.types.Message):
@@ -452,6 +491,24 @@ if config.MODULES["email"]:
         bot.send_chat_action(call.message.chat.id, 'typing')
         
         email_read(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data == "email_confirm_send")
+    def email_confirm_send_callback(call):
+        if not check(call.from_user.id):
+            return
+        libs.email.handle_email_confirm_send(call, bot)
+
+    @bot.callback_query_handler(func=lambda call: call.data == "email_cancel")
+    def email_cancel_callback(call):
+        if not check(call.from_user.id):
+            return
+        libs.email.handle_email_cancel(call, bot)
+
+    @bot.callback_query_handler(func=lambda call: call.data == "email_attach_files" or call.data == "email_attach_more")
+    def email_attach_files_callback(call):
+        if not check(call.from_user.id):
+            return
+        libs.email.handle_email_attach_files(call, bot)
 
 if config.MODULES["files"]:  
     @bot.callback_query_handler(func=lambda call: call.data.startswith('file_page_'))
