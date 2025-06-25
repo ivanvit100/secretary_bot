@@ -530,6 +530,20 @@ if config.MODULES["files"]:
             return
         
         download_file(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('file_delete_'))
+    def file_delete_handler(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        delete_file_by_callback(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('file_deletepage_'))
+    def file_delete_page_handler(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        delete_files_menu(call, bot)
 
 if config.MODULES["task"]:
     @bot.callback_query_handler(func=lambda call: call.data.startswith('task_view_'))

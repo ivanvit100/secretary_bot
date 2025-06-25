@@ -419,7 +419,49 @@ def handle_menu_callback(call, bot):
         
         # Файлы
         elif callback_data == "menu_files":
-            show_files_menu(call, bot)
+            bot.answer_callback_query(call.id)
+            if config.MODULES["files"]:
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    types.InlineKeyboardButton(_("menu_files_private"), callback_data="menu_files_private"),
+                    types.InlineKeyboardButton(_("menu_files_public"), callback_data="menu_files_public"),
+                    types.InlineKeyboardButton(_("menu_files_delete"), callback_data="menu_files_delete"),
+                    types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
+                )
+
+                bot.edit_message_text(
+                    _("menu_files_title"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=markup
+                )
+        elif callback_data == "menu_files_delete":
+            bot.answer_callback_query(call.id)
+            if config.MODULES["files"]:
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    types.InlineKeyboardButton(_("menu_files_delete_private"), callback_data="menu_files_delete_private"),
+                    types.InlineKeyboardButton(_("menu_files_delete_public"), callback_data="menu_files_delete_public"),
+                    types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_files")
+                )
+
+                bot.edit_message_text(
+                    _("menu_files_delete_title"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=markup
+                )
+        # Обработчики для команд удаления приватных и публичных файлов
+        elif callback_data == "menu_files_delete_private":
+            bot.answer_callback_query(call.id)
+            if config.MODULES["files"]:
+                from libs.files import delete_files_menu
+                delete_files_menu(call, bot, 1)
+        elif callback_data == "menu_files_delete_public":
+            bot.answer_callback_query(call.id)
+            if config.MODULES["files"]:
+                from libs.files import delete_files_menu
+                delete_files_menu(call, bot, 0)
         elif callback_data == "menu_files_private":
             bot.answer_callback_query(call.id)
             if config.MODULES["files"]:

@@ -144,18 +144,156 @@ def show_files(message: telebot.types.Message, bot: telebot.TeleBot, type_flag: 
         user_id = message.from_user.id if isinstance(message, types.CallbackQuery) else message.from_user.id
         bot.send_message(user_id, _('file_error'))
 
-def delete_file(message: telebot.types.Message, bot: telebot.TeleBot, type_flag: bool = 0):
+def delete_files_menu(message: telebot.types.Message, bot: telebot.TeleBot, type_flag: bool = 0, page: int = 0):
     try:
-        file_name = message.text.split(' ')[1]
-        file_path = f'{'files' if type_flag else 'public_files'}/{file_name}'
+        if isinstance(message, types.CallbackQuery):
+            parts = message.data.split('_')
+            
+            if len(parts) >= 4 and parts[1] == "deletepage":
+                try:
+                    type_flag = int(parts[2])
+                    page = int(parts[3])
+                except ValueError:
+                    logging.warning(f"Invalid format in callback_data: {message.data}")
+            
+            elif message.data == "menu_files_delete_private":
+                type_flag = 1
+                page = 0
+            elif message.data == "menu_files_delete_public":
+                type_flag = 0
+                page = 0
+                
+            user_id = message.from_user.id
+            bot.answer_callback_query(message.id)
+        else:
+            user_id = message.from_user.id
+
+        folder = 'files' if type_flag else 'public_files'
+        files = sorted(os.listdir(folder))
+        if not files:
+            if isinstance(message, types.CallbackQuery):
+                bot.edit_message_text(_('files_list_empty'), user_id, message.message.message_id)
+            else:
+                bot.send_message(user_id, _('files_list_empty'))
+            return
+        
+        files_per_page = 8
+        total_pages = max(1, math.ceil(len(files) / files_per_page))
+        
+        if page < 0:
+            page = 0
+        elif page >= total_pages:
+            page = total_pages - 1
+        
+        start_idx = page * files_per_page
+        end_idx = min(start_idx + files_per_page, len(files))
+        current_page_files = files[start_idx:end_idx]
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        for idx, file_name in enumerate(current_page_files):
+            absolute_idx = start_idx + idx
+            display_name = file_name[:40] + '...' if len(file_name) > 40 else file_name
+            delete_button = types.InlineKeyboardButton(
+                f"🗑️ {display_name}", 
+                callback_data=f"file_delete_{1 if type_flag else 0}_{absolute_idx}"
+            )
+            markup.add(delete_button)
+        
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append(types.InlineKeyboardButton(
+                "◀️ " + _('prev_page'), 
+                callback_data=f"file_deletepage_{1 if type_flag else 0}_{page-1}"
+            ))
+        
+        if page < total_pages - 1:
+            nav_buttons.append(types.InlineKeyboardButton(
+                _('next_page') + " ▶️", 
+                callback_data=f"file_deletepage_{1 if type_flag else 0}_{page+1}"
+            ))
+        
+        markup.add(types.InlineKeyboardButton(
+            "🔙 " + _('back_to_menu'),
+            callback_data="menu_files"
+        ))
+        
+        if nav_buttons:
+            markup.row(*nav_buttons)
+        
+        folder_title = _("delete_private_files_title") if type_flag else _("delete_public_files_title")
+        message_text = f"*{folder_title}*\n" + \
+                      f"_{_('page')} {page + 1} {_('of')} {total_pages}_"
+        
+        if isinstance(message, types.CallbackQuery):
+            bot.edit_message_text(
+                message_text,
+                user_id,
+                message.message.message_id,
+                parse_mode='Markdown',
+                reply_markup=markup
+            )
+        else:
+            bot.send_message(
+                user_id,
+                message_text,
+                parse_mode='Markdown',
+                reply_markup=markup
+            )
+    except Exception as e:
+        logging.error(f"Error in delete_files_menu: {e}")
+        user_id = message.from_user.id if isinstance(message, types.CallbackQuery) else message.from_user.id
+        bot.send_message(user_id, _('file_error'))
+
+def delete_file_by_callback(call: types.CallbackQuery, bot: telebot.TeleBot):
+    try:
+        parts = call.data.split('_')
+        type_flag = int(parts[2])
+        file_index = int(parts[3])
+        user_id = call.from_user.id
+        
+        folder = 'files' if type_flag else 'public_files'
+        files = sorted(os.listdir(folder))
+        
+        if file_index < 0 or file_index >= len(files):
+            bot.answer_callback_query(call.id, _('file_not_found'))
+            return
+            
+        file_name = files[file_index]
+        file_path = f'{folder}/{file_name}'
         
         if not os.path.exists(file_path):
-            bot.send_message(message.from_user.id, _('file_not_found'))
+            bot.answer_callback_query(call.id, _('file_not_found'))
             return
             
         os.remove(file_path)
-        logging.info(f'File {file_name} deleted')
-        bot.send_message(message.from_user.id, _('file_deleted'), parse_mode='Markdown')
+        logging.info(f'File {file_name} deleted via menu')
+        
+        bot.answer_callback_query(call.id, text=_('file_deleted_notification'))
+        
+        current_page = file_index // 8
+        delete_files_menu(call, bot, type_flag, current_page)
+        
+    except Exception as e:
+        logging.error(f"Error in delete_file_by_callback: {e}")
+        bot.answer_callback_query(call.id, text=_('file_error'))
+        bot.send_message(call.from_user.id, _('file_error'))
+
+def delete_file(message: telebot.types.Message, bot: telebot.TeleBot, type_flag: bool = 0):
+    try:
+        if len(message.text.split(' ')) > 1:
+            file_name = message.text.split(' ')[1]
+            folder = 'files' if type_flag else 'public_files'
+            file_path = f'{folder}/{file_name}'
+            
+            if not os.path.exists(file_path):
+                bot.send_message(message.from_user.id, _('file_not_found'))
+                return
+            
+            os.remove(file_path)
+            logging.info(f'File {file_name} deleted')
+            bot.send_message(message.from_user.id, _('file_deleted'))
+        else:
+            delete_files_menu(message, bot, type_flag)
     except Exception as e:
         logging.error(f"Error in delete_file: {e}")
         bot.send_message(message.from_user.id, _('file_error'))

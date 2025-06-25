@@ -106,6 +106,18 @@ messages = {
     "next_page": "Next",
     "page": "Page",
     "of": "of",
+    "file_deleted": "✅ File deleted",
+    "file_deleted_notification": "File deleted",
+    "delete_private_files_title": "Delete Private Files",
+    "delete_public_files_title": "Delete Public Files",
+    "menu_files_delete": "🗑️ Delete Files",
+    "menu_files_delete_title": "Select file type to delete",
+    "menu_files_delete_private": "🔒 Delete Private Files",
+    "menu_files_delete_public": "🌐 Delete Public Files",
+    "back_to_menu": "Back to Menu",
+    "menu_files_private": "🔒 Private Files",
+    "menu_files_public": "🌐 Public Files",
+    "menu_files_title": "File Management",
 
     # Notifications
     "notification_alert": "Attention! New notification!",
