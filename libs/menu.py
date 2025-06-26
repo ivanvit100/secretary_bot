@@ -97,31 +97,6 @@ def show_notifications_menu(call, bot):
         logging.error(f"Error in show_notifications_menu: {e}")
         bot.answer_callback_query(call.id, text=_("error_occurred"))
 
-def show_files_menu(call, bot):
-    try:
-        markup = types.InlineKeyboardMarkup(row_width=1)
-        
-        markup.add(
-            types.InlineKeyboardButton(_("menu_files_private_button"), callback_data="menu_files_private"),
-            types.InlineKeyboardButton(_("menu_files_public_button"), callback_data="menu_files_public"),
-            types.InlineKeyboardButton(_("menu_files_upload_button"), callback_data="menu_files_upload"),
-            types.InlineKeyboardButton(_("menu_files_delete_button"), callback_data="menu_files_delete"),
-            types.InlineKeyboardButton(_("menu_files_pdelete_button"), callback_data="menu_files_pdelete"),
-            types.InlineKeyboardButton(_("menu_files_share_button"), callback_data="menu_files_share"),
-            types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
-        )
-        
-        bot.edit_message_text(
-            _("menu_files_title"),
-            call.message.chat.id,
-            call.message.message_id,
-            parse_mode="Markdown",
-            reply_markup=markup
-        )
-    except Exception as e:
-        logging.error(f"Error in show_files_menu: {e}")
-        bot.answer_callback_query(call.id, text=_("error_occurred"))
-
 def is_in_ssh_mode(user_id):
     return user_id in ssh_mode_users
 
@@ -425,10 +400,11 @@ def handle_menu_callback(call, bot):
                 markup.add(
                     types.InlineKeyboardButton(_("menu_files_private"), callback_data="menu_files_private"),
                     types.InlineKeyboardButton(_("menu_files_public"), callback_data="menu_files_public"),
+                    types.InlineKeyboardButton(_("menu_files_share"), callback_data="menu_files_share"),
                     types.InlineKeyboardButton(_("menu_files_delete"), callback_data="menu_files_delete"),
                     types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
                 )
-
+        
                 bot.edit_message_text(
                     _("menu_files_title"),
                     call.message.chat.id,
@@ -497,6 +473,15 @@ def handle_menu_callback(call, bot):
                     show_files(file_message, bot, 0)
                 except Exception as e:
                     logging.error(f"Error showing public files: {e}")
+                    bot.send_message(call.message.chat.id, _("menu_files_error").format(error=e))
+        elif callback_data == "menu_files_share":
+            bot.answer_callback_query(call.id)
+            if config.MODULES["files"]:
+                try:
+                    from libs.files import share_files_menu
+                    share_files_menu(call, bot)
+                except Exception as e:
+                    logging.error(f"Error showing files sharing menu: {e}")
                     bot.send_message(call.message.chat.id, _("menu_files_error").format(error=e))
 
         # Лог

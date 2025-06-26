@@ -545,6 +545,20 @@ if config.MODULES["files"]:
         bot.send_chat_action(call.message.chat.id, 'typing')
         delete_files_menu(call, bot)
 
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('file_share_'))
+    def file_share_handler(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        share_file_by_callback(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('file_sharepage_'))
+    def file_share_page_handler(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        share_files_menu(call, bot)
+
 if config.MODULES["task"]:
     @bot.callback_query_handler(func=lambda call: call.data.startswith('task_view_'))
     def task_view_callback(call):
