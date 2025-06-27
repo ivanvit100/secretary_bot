@@ -317,4 +317,13 @@ messages = {
     "menu_log_error": "Error retrieving logs: {error}",
     "menu_tasks_error": "Error retrieving task list: {error}",
     "menu_vps_error": "Error retrieving VPS statistics: {error}",
+
+    # Keyboard
+    "keyboard_files": "📁 Files",
+    "keyboard_email": "📧 Email",
+    "keyboard_balance": "💰 Balance",
+    "keyboard_tasks": "📝 Tasks",
+    "keyboard_notifications": "🔔 Notifications",
+    "keyboard_vps": "🖥️ VPS",
+    "keyboard_hide": "❌ Hide Keyboard",
 }

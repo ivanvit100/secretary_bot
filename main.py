@@ -128,7 +128,7 @@ def main():
     scheduler_thread.daemon = True
     scheduler_thread.start()
     
-    bot.send_message(USER_ID, _('secretary_started'))
+    libs.menu.show_reply_keyboard(USER_ID, bot)
     logging.info('Secretary bot started')
     
     while True:
@@ -152,6 +152,8 @@ def ssh_mode_message_handler(message):
 def start(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
     bot.send_message(message.from_user.id, _('cmd_start'))
+    if check(message.from_user.id):
+        libs.menu.show_reply_keyboard(message, bot)
 
 @bot.message_handler(commands=['link'])
 def link(message: telebot.types.Message):
@@ -475,7 +477,43 @@ def menu_command(message: telebot.types.Message):
     bot.send_chat_action(message.chat.id, 'typing')
     if not check(message.from_user.id):
         return
-    libs.menu.menu(message, bot)
+    libs.menu.menu(message, bot)    
+
+#########################
+#                       #
+#       KEYBOARDS       #
+#                       #
+#########################
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_files") and check(message.from_user.id))
+def keyboard_files_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_files(message, bot)
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_email") and check(message.from_user.id))
+def keyboard_email_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_email(message, bot)
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_balance") and check(message.from_user.id))
+def keyboard_balance_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_balance(message, bot)
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_tasks") and check(message.from_user.id))
+def keyboard_tasks_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_tasks(message, bot)
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_notifications") and check(message.from_user.id))
+def keyboard_notifications_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_notifications(message, bot)
+
+@bot.message_handler(func=lambda message: message.text == _("keyboard_vps") and check(message.from_user.id))
+def keyboard_vps_handler(message):
+    bot.send_chat_action(message.chat.id, 'typing')
+    libs.menu.handle_keyboard_vps(message, bot)
 
 #########################
 #                       #

@@ -3,10 +3,6 @@ from telebot import types
 import config
 from i18n import _
 import logging
-from libs.email import (
-    start_email_send, handle_email_confirm_send, 
-    handle_email_cancel, handle_email_attach_files
-)
 
 ssh_mode_users = {}
 
@@ -513,3 +509,150 @@ def handle_menu_callback(call, bot):
     except Exception as e:
         logging.error(f"Error in handle_menu_callback: {e}")
         bot.answer_callback_query(call.id, text=_("error_occurred"))
+
+# Keyboard
+def show_reply_keyboard(message_or_user_id, bot):
+    if isinstance(message_or_user_id, telebot.types.Message):
+        user_id = message_or_user_id.chat.id
+    else:
+        user_id = message_or_user_id
+    
+    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    buttons = []
+    
+    if config.MODULES["files"]:
+        buttons.append(types.KeyboardButton(_("keyboard_files")))
+    if config.MODULES["email"]:
+        buttons.append(types.KeyboardButton(_("keyboard_email")))
+    if config.MODULES["balance"]:
+        buttons.append(types.KeyboardButton(_("keyboard_balance")))
+    if config.MODULES["task"]:
+        buttons.append(types.KeyboardButton(_("keyboard_tasks")))
+    if config.MODULES["notification"]:
+        buttons.append(types.KeyboardButton(_("keyboard_notifications")))
+    if config.MODULES["vps"]:
+        buttons.append(types.KeyboardButton(_("keyboard_vps")))
+    
+    for i in range(0, len(buttons), 2):
+        if i + 1 < len(buttons):
+            keyboard.row(buttons[i], buttons[i+1])
+        else:
+            keyboard.row(buttons[i])
+    
+    bot.send_message(
+        user_id,
+        _("secretary_started"),
+        reply_markup=keyboard
+    )
+
+def handle_keyboard_files(message, bot):
+    if config.MODULES["files"]:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            types.InlineKeyboardButton(_("menu_files_private"), callback_data="menu_files_private"),
+            types.InlineKeyboardButton(_("menu_files_public"), callback_data="menu_files_public"),
+            types.InlineKeyboardButton(_("menu_files_share"), callback_data="menu_files_share"),
+            types.InlineKeyboardButton(_("menu_files_delete"), callback_data="menu_files_delete"),
+            types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
+        )
+
+        bot.send_message(
+            message.chat.id,
+            _("menu_files_title"),
+            reply_markup=markup
+        )
+
+def handle_keyboard_email(message, bot):
+    if config.MODULES["email"]:
+        try:
+            import os
+            email_address = os.getenv('EMAIL_ADDRESS')
+
+            if ',' in email_address:
+                email_list = [email.strip() for email in email_address.split(',')]
+                markup = types.InlineKeyboardMarkup(row_width=1)
+
+                for idx, email in enumerate(email_list):
+                    markup.add(types.InlineKeyboardButton(f"📧 {email}", callback_data=f"menu_email_select_{idx}_{email}"))
+
+                markup.add(types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main"))
+
+                bot.send_message(
+                    message.chat.id,
+                    _("menu_email_select_title"),
+                    parse_mode="Markdown",
+                    reply_markup=markup
+                )
+            else:
+                markup = types.InlineKeyboardMarkup(row_width=1)
+                markup.add(
+                    types.InlineKeyboardButton(_("menu_email_send_button"), callback_data="menu_email_send_0"),
+                    types.InlineKeyboardButton(_("menu_email_read_button"), callback_data="menu_email_list_0"),
+                    types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
+                )
+
+                bot.send_message(
+                    message.chat.id,
+                    _("menu_email_mailbox_title").format(email=email_address),
+                    parse_mode="Markdown",
+                    reply_markup=markup
+                )
+        except Exception as e:
+            logging.error(f"Error handling email keyboard: {e}")
+            bot.send_message(message.chat.id, _("menu_email_error").format(error=e))
+
+def handle_keyboard_balance(message, bot):
+    if config.MODULES["balance"]:
+        try:
+            from libs.balance import balance_main
+            
+            balance_message = telebot.types.Message(
+                message_id=message.message_id,
+                from_user=message.from_user,
+                date=message.date,
+                chat=message.chat,
+                content_type='text',
+                options={},
+                json_string=''
+            )
+            balance_message.text = '/balance'
+            
+            balance_main(balance_message, bot)
+        except Exception as e:
+            logging.error(f"Error handling balance keyboard: {e}")
+            bot.send_message(message.chat.id, _("menu_balance_error").format(error=e))
+
+def handle_keyboard_tasks(message, bot):
+    if config.MODULES["task"]:
+        try:
+            from libs.task import tasks_list
+            tasks_list(message, bot)
+        except Exception as e:
+            logging.error(f"Error handling tasks keyboard: {e}")
+            bot.send_message(message.chat.id, _("menu_tasks_error").format(error=e))
+
+def handle_keyboard_notifications(message, bot):
+    if config.MODULES["notification"]:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        
+        markup.add(
+            types.InlineKeyboardButton(_("menu_notification_list_button"), callback_data="menu_notification_list"),
+            types.InlineKeyboardButton(_("menu_notification_add_button"), callback_data="menu_notification_add"),
+            types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main")
+        )
+        
+        bot.send_message(
+            message.chat.id,
+            _("menu_notifications_title"),
+            parse_mode="Markdown",
+            reply_markup=markup
+        )
+
+def handle_keyboard_vps(message, bot):
+    if config.MODULES["vps"]:
+        try:
+            from libs.vps import get_vps_data
+            get_vps_data(message, bot)
+        except Exception as e:
+            logging.error(f"Error handling VPS keyboard: {e}")
+            bot.send_message(message.chat.id, _("menu_vps_error").format(error=e))
