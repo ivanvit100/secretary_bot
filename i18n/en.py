@@ -46,6 +46,7 @@ messages = {
     "daily_saldo": "Saldo",
     "daily_tasks": "Tasks",
     "daily_completed": "Completed this month",
+    "daily_notifications_title": "Today's Notifications",
     
     # Startup
     "secretary_started": "Secretary started",

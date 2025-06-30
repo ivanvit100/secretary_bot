@@ -2,8 +2,9 @@ import datetime
 import telebot
 import logging
 import config
-import os
 import math
+import json
+import os
 from dotenv import load_dotenv
 from threading import Timer
 from telebot import types
@@ -12,8 +13,9 @@ from i18n import _
 
 load_dotenv()
 
-scheduled_jobs = []
 USER_ID = os.getenv('USER_ID')
+NOTIFICATIONS_FILE = "data/notifications.json"
+scheduled_jobs = []
 user_states = {}
 
 class NotificationStates:
@@ -30,6 +32,45 @@ class NotificationData:
         self.message = None
         self.orig_message_id = None
 
+def save_notifications_to_file():
+    try:
+        notifications_data = []
+        for run_at, message, _ in scheduled_jobs:
+            notifications_data.append({
+                "run_at": run_at,
+                "message": message
+            })
+        
+        with open(NOTIFICATIONS_FILE, "w", encoding="utf-8") as file:
+            json.dump(notifications_data, file, ensure_ascii=False, indent=4)
+        
+        logging.info(f"Saved {len(notifications_data)} notifications to file")
+    except Exception as e:
+        logging.error(f"Error saving notifications to file: {e}")
+
+def load_notifications_from_file(bot):
+    try:
+        if not os.path.exists(NOTIFICATIONS_FILE):
+            logging.info("Notifications file does not exist yet")
+            return
+            
+        with open(NOTIFICATIONS_FILE, "r", encoding="utf-8") as file:
+            notifications_data = json.load(file)
+        
+        for notification in notifications_data:
+            run_at = notification["run_at"]
+            message = notification["message"]
+            schedule_message(message, run_at, bot, save_to_file=False)
+            
+        logging.info(f"Loaded {len(notifications_data)} notifications from file")
+    except Exception as e:
+        logging.error(f"Error loading notifications from file: {e}")
+
+def init_notifications(bot):
+    if not os.path.exists('data'):
+        os.makedirs('data')
+    load_notifications_from_file(bot)
+
 def send_delayed_message(message: str, run_at: str, bot: telebot.TeleBot):
     bot.send_message(USER_ID, f'*{i18n._("notification_alert")}*\n\n{message}', parse_mode="Markdown")
     
@@ -39,7 +80,7 @@ def send_delayed_message(message: str, run_at: str, bot: telebot.TeleBot):
             logging.info(f"Notification automatically removed after delivery: {run_at}")
             break
 
-def schedule_message(message: str, run_at: str, bot: telebot.TeleBot):
+def schedule_message(message: str, run_at: str, bot: telebot.TeleBot, save_to_file=True):
     run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
     delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3 - config.UTC)).total_seconds()
     
@@ -48,6 +89,10 @@ def schedule_message(message: str, run_at: str, bot: telebot.TeleBot):
         scheduled_jobs.append((run_at, message, timer))
         timer.start()
         logging.info(i18n._("notification_scheduled", time=run_at))
+
+        if save_to_file:
+            save_notifications_to_file()
+
         return True
     else:
         logging.warning(i18n._("notification_past_error", time=run_at))
@@ -58,6 +103,7 @@ def cancel_scheduled_message(index: int):
         scheduled_jobs[index][2].cancel()
         del scheduled_jobs[index]
         logging.info(i18n._("notification_cancelled", index=index))
+        save_notifications_to_file()
         return True
     else:
         logging.warning(i18n._("notification_invalid_index", index=index))
@@ -118,6 +164,41 @@ def schedule_list(bot: telebot.TeleBot, page: int = 0):
         )
     else:
         bot.send_message(USER_ID, i18n._("notification_list_empty"))
+
+def get_notifications_for_date(date_str=None):
+    if date_str is None:
+        today = datetime.datetime.now().strftime("%d.%m.%Y")
+    else:
+        today = date_str
+    
+    today_notifications = []
+    
+    for idx, (run_at, message, _) in enumerate(scheduled_jobs):
+        if run_at.startswith(today):
+            today_notifications.append((idx, run_at, message))
+    
+    return today_notifications
+
+def get_today_notifications_markup():
+    today = datetime.datetime.now().strftime("%d.%m.%Y")
+    today_notifications = get_notifications_for_date(today)
+    
+    if not today_notifications:
+        return None
+    
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    
+    for idx, run_at, message in today_notifications:
+        time_part = run_at.split()[1]
+        display_text = message[:30] + "..." if len(message) > 30 else message
+        button_text = f"🔔 {time_part} - {display_text}"
+        
+        markup.add(types.InlineKeyboardButton(
+            button_text, 
+            callback_data=f"notification_view_{idx}"
+        ))
+    
+    return markup
 
 def notification_view(call, bot: telebot.TeleBot):
     try:

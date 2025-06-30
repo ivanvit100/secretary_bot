@@ -46,6 +46,7 @@ messages = {
     "daily_saldo": "Сальдо",
     "daily_tasks": "Задачи",
     "daily_completed": "Выполнено в этом месяце",
+    "daily_notifications_title": "Уведомления на сегодня",
     
     # Запуск
     "secretary_started": "Секретарь запущен",

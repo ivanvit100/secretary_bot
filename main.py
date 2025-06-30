@@ -100,8 +100,22 @@ def everyday_job():
             count = len(tasks["tasks"])
             completed = tasks["complete"]
             message += f'{_("daily_tasks")}: `{count}`\n{_("daily_completed")}: `{completed}`'
-
-        bot.send_message(USER_ID, message, parse_mode='Markdown')
+        
+        markup = None
+        if config.MODULES["notification"]:
+            from libs.notification import get_today_notifications_markup
+            today_notifications_markup = get_today_notifications_markup()
+            
+            if today_notifications_markup:
+                message += f'\n\n*{_("daily_notifications_title")}*'
+                markup = today_notifications_markup
+        
+        bot.send_message(
+            USER_ID, 
+            message, 
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
 
     except Exception as e:
         logging.error(f'Error in everyday_job: {e}')
@@ -118,8 +132,6 @@ def main():
         os.makedirs('public_files')
     if not os.path.exists('data'):
         os.makedirs('data')
-        
-    everyday_job()
     
     report_time = (0 + config.UTC) % 24
     schedule.every().day.at(f"{report_time:02d}:00").do(everyday_job)
@@ -127,9 +139,15 @@ def main():
     scheduler_thread = threading.Thread(target=schedule_checker)
     scheduler_thread.daemon = True
     scheduler_thread.start()
+
+    if config.MODULES["notification"]:
+        from libs.notification import init_notifications
+        init_notifications(bot)
     
     libs.menu.show_reply_keyboard(USER_ID, bot)
     logging.info('Secretary bot started')
+    
+    everyday_job()
     
     while True:
         try:
