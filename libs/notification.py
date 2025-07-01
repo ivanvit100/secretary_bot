@@ -35,10 +35,13 @@ class NotificationData:
 def save_notifications_to_file():
     try:
         notifications_data = []
-        for run_at, message, _ in scheduled_jobs:
+        for run_at, message, timer in scheduled_jobs:
+            repeat_mode = getattr(timer, "repeat_mode", "none")
+            
             notifications_data.append({
                 "run_at": run_at,
-                "message": message
+                "message": message,
+                "repeat": repeat_mode
             })
         
         with open(NOTIFICATIONS_FILE, "w", encoding="utf-8") as file:
@@ -60,11 +63,39 @@ def load_notifications_from_file(bot):
         for notification in notifications_data:
             run_at = notification["run_at"]
             message = notification["message"]
-            schedule_message(message, run_at, bot, save_to_file=False)
+            repeat_mode = notification.get("repeat", "none")
+            
+            schedule_message(message, run_at, bot, save_to_file=False, repeat=repeat_mode)
             
         logging.info(f"Loaded {len(notifications_data)} notifications from file")
     except Exception as e:
         logging.error(f"Error loading notifications from file: {e}")
+
+def calculate_next_run_time(current_run_at, repeat_mode):
+    run_at_datetime = datetime.datetime.strptime(current_run_at, '%d.%m.%Y %H:%M')
+    
+    if repeat_mode == "hourly":
+        next_time = run_at_datetime + datetime.timedelta(hours=1)
+    elif repeat_mode == "daily":
+        next_time = run_at_datetime + datetime.timedelta(days=1)
+    elif repeat_mode == "weekly":
+        next_time = run_at_datetime + datetime.timedelta(weeks=1)
+    elif repeat_mode == "monthly":
+        month = run_at_datetime.month + 1
+        year = run_at_datetime.year
+        if month > 12:
+            month = 1
+            year += 1
+        days_in_month = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 
+                         31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        day = min(run_at_datetime.day, days_in_month[month-1])
+        next_time = run_at_datetime.replace(year=year, month=month, day=day)
+    elif repeat_mode == "yearly":
+        next_time = run_at_datetime.replace(year=run_at_datetime.year + 1)
+    else:
+        return current_run_at
+    
+    return next_time.strftime('%d.%m.%Y %H:%M')
 
 def init_notifications(bot):
     if not os.path.exists('data'):
@@ -76,16 +107,29 @@ def send_delayed_message(message: str, run_at: str, bot: telebot.TeleBot):
     
     for i, job in enumerate(scheduled_jobs[:]):
         if job[0] == run_at and job[1] == message:
-            del scheduled_jobs[i]
-            logging.info(f"Notification automatically removed after delivery: {run_at}")
+            timer = job[2]
+            repeat_mode = getattr(timer, "repeat_mode", "none")
+            
+            if repeat_mode == "none":
+                del scheduled_jobs[i]
+                logging.info(f"Notification automatically removed after delivery: {run_at}")
+                save_notifications_to_file()
+            else:
+                new_run_at = calculate_next_run_time(run_at, repeat_mode)
+                del scheduled_jobs[i]
+                schedule_message(message, new_run_at, bot, repeat=repeat_mode)
+                logging.info(f"Notification rescheduled for {new_run_at} with repeat mode {repeat_mode}")
+            
             break
 
-def schedule_message(message: str, run_at: str, bot: telebot.TeleBot, save_to_file=True):
+def schedule_message(message: str, run_at: str, bot: telebot.TeleBot, save_to_file=True, repeat="none"):
     run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
     delay = (run_at_datetime - datetime.datetime.now() - datetime.timedelta(hours=3 - config.UTC)).total_seconds()
     
     if delay > 0:
         timer = Timer(delay, send_delayed_message, [message, run_at, bot])
+        timer.repeat_mode = repeat
+        
         scheduled_jobs.append((run_at, message, timer))
         timer.start()
         logging.info(i18n._("notification_scheduled", time=run_at))
@@ -206,6 +250,7 @@ def notification_view(call, bot: telebot.TeleBot):
         
         if 0 <= notification_index < len(scheduled_jobs):
             run_at, message_text, timer = scheduled_jobs[notification_index]
+            repeat_mode = getattr(timer, "repeat_mode", "none")
             
             run_at_datetime = datetime.datetime.strptime(run_at, '%d.%m.%Y %H:%M')
             time_remaining = run_at_datetime - datetime.datetime.now()
@@ -222,15 +267,25 @@ def notification_view(call, bot: telebot.TeleBot):
                     callback_data=f"notification_cancel_{notification_index}"
                 ),
                 types.InlineKeyboardButton(
+                    i18n._('notification_button_repeat'), 
+                    callback_data=f"notification_repeat_{notification_index}"
+                )
+            )
+            markup.add(
+                types.InlineKeyboardButton(
                     i18n._('notification_button_back'), 
                     callback_data="notification_list"
                 )
             )
             
+            repeat_info = ""
+            if repeat_mode != "none":
+                repeat_info = f"\n{i18n._('notification_repeat_info')}: `{i18n._(f'repeat_{repeat_mode}')}`"
+            
             notification_text = (
                 f"*{i18n._('notification_details')}*\n\n"
                 f"{i18n._('notification_date')}: `{run_at}`\n"
-                f"{i18n._('notification_time_remaining')}: `{time_remaining_str}`\n\n"
+                f"{i18n._('notification_time_remaining')}: `{time_remaining_str}`{repeat_info}\n\n"
                 f"{i18n._('notification_message')}:\n{message_text}"
             )
             
@@ -248,6 +303,89 @@ def notification_view(call, bot: telebot.TeleBot):
     except Exception as e:
         logging.error(f"Error in notification_view: {e}")
         bot.answer_callback_query(call.id, i18n._('notification_error'))
+
+def show_repeat_options(call, bot, notification_index):
+    try:
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        
+        markup.add(
+            types.InlineKeyboardButton(
+                i18n._("repeat_none"), 
+                callback_data=f"notification_set_repeat_{notification_index}_none"
+            ),
+            types.InlineKeyboardButton(
+                i18n._("repeat_hourly"), 
+                callback_data=f"notification_set_repeat_{notification_index}_hourly"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                i18n._("repeat_daily"), 
+                callback_data=f"notification_set_repeat_{notification_index}_daily"
+            ),
+            types.InlineKeyboardButton(
+                i18n._("repeat_weekly"), 
+                callback_data=f"notification_set_repeat_{notification_index}_weekly"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                i18n._("repeat_monthly"), 
+                callback_data=f"notification_set_repeat_{notification_index}_monthly"
+            ),
+            types.InlineKeyboardButton(
+                i18n._("repeat_yearly"), 
+                callback_data=f"notification_set_repeat_{notification_index}_yearly"
+            )
+        )
+        markup.add(
+            types.InlineKeyboardButton(
+                i18n._("notification_button_back"), 
+                callback_data=f"notification_view_{notification_index}"
+            )
+        )
+        
+        bot.edit_message_text(
+            i18n._("notification_select_repeat_frequency"),
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+        
+        bot.answer_callback_query(call.id)
+    except Exception as e:
+        logging.error(f"Error showing repeat options: {e}")
+        bot.answer_callback_query(call.id, i18n._("notification_error"))
+
+def set_notification_repeat(call, bot):
+    try:
+        parts = call.data.split('_')
+        notification_index = int(parts[3])
+        repeat_mode = parts[4]
+        
+        if 0 <= notification_index < len(scheduled_jobs):
+            run_at, message, timer = scheduled_jobs[notification_index]
+            timer.repeat_mode = repeat_mode
+            
+            save_notifications_to_file()
+            
+            notification_view_callback = types.CallbackQuery(
+                id=call.id,
+                from_user=call.from_user,
+                message=call.message,
+                chat_instance=call.chat_instance,
+                data=f"notification_view_{notification_index}",
+                json_string=""
+            )
+            notification_view(notification_view_callback, bot)
+            
+            bot.answer_callback_query(call.id, i18n._("notification_repeat_updated"))
+        else:
+            bot.answer_callback_query(call.id, i18n._("notification_not_found"))
+    except Exception as e:
+        logging.error(f"Error setting notification repeat: {e}")
+        bot.answer_callback_query(call.id, i18n._("notification_error"))
 
 def notification_cancel(call, bot: telebot.TeleBot):
     try:

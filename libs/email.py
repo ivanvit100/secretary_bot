@@ -535,9 +535,9 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
                     markup.add(types.InlineKeyboardButton(button_text, callback_data=callback_data))
                 
                 bot.send_message(
-                    message.from_user.id,
-                    f"*{_('email_list_title', email=credentials['email'])}*",
-                    parse_mode='Markdown',
+                    message.chat.id,
+                    _('email_list_title').format(email='`' + credentials['email'] + '`'),
+                    parse_mode="Markdown",
                     reply_markup=markup
                 )
             except Exception as e:

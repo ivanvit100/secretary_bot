@@ -729,6 +729,20 @@ if config.MODULES["notification"]:
             return
         bot.send_chat_action(call.message.chat.id, 'typing')
         notification_page_callback(call, bot)
+    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('notification_repeat_'))
+    def notification_repeat_callback(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        show_repeat_options(call, bot, int(call.data.split('_')[2]))
+    
+    @bot.callback_query_handler(func=lambda call: call.data.startswith('notification_set_repeat_'))
+    def set_notification_repeat_callback(call):
+        if not check(call.from_user.id):
+            return
+        bot.send_chat_action(call.message.chat.id, 'typing')
+        set_notification_repeat(call, bot)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('menu_'))
 def menu_callback_handler(call):

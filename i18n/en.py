@@ -85,7 +85,7 @@ messages = {
 
     # Email messages
     "email_no_messages": "No new messages",
-    "email_list_title": "List of recent messages for `{email}`:",
+    "email_list_title": "List of recent messages for {email}",
     "email_sent_success": "Message sent to email",
     "email_error": "An error occurred while sending the message",
     "email_subject_default": "Message from {name}",
@@ -159,6 +159,18 @@ messages = {
     "notification_back_to_date": "Back to date selection",
     "notification_back_to_hour": "Back to hour selection",
     "notification_session_expired": "Session of creating notification is timed out. Please, try again.",
+    "notification_button_repeat": "🔄 Repeat",
+    "notification_repeat_info": "Repeat",
+    "notification_select_repeat_frequency": "Select notification repeat frequency:",
+    "notification_repeat_updated": "Repeat frequency updated",
+    "repeat_none": "No repeat",
+    "repeat_hourly": "Every hour",
+    "repeat_daily": "Daily",
+    "repeat_weekly": "Weekly",
+    "repeat_monthly": "Monthly",
+    "repeat_yearly": "Yearly",
+
+    #Email messages
     "menu_email_send_instructions": "To send an email from account {email}, use the format:\n/email {idx} address subject | message text",
     "menu_email_send_error": "Error preparing to send email: {error}",
     "email_not_configured": "Email is not configured. Check the EMAIL_ADDRESS, EMAIL_PASSWORD, IMAP_ADDRESS, and SMTP_ADDRESS environment variables.",
