@@ -102,22 +102,26 @@ def forecast_balance_and_saldo(data: dict):
     except Exception as e:
         logging.error(f"Error in forecast_balance_and_saldo: {e}")
 
-def report(bot: telebot, USER_ID: str):
+def generate_report_data(data):
     try:
-        data = get_full_balance()
         plot_balance(data)
         plot_income_expenses(data)
-        (forecast_balance_current, forecast_saldo_current), (forecast_balance_next, forecast_saldo_next) = forecast_balance_and_saldo(data)
+        
+        forecast_result = forecast_balance_and_saldo(data)
+        if forecast_result:
+            (forecast_balance_current, forecast_saldo_current), (forecast_balance_next, forecast_saldo_next) = forecast_result
+        else:
+            forecast_balance_current = forecast_saldo_current = forecast_balance_next = forecast_saldo_next = 0
 
         months = list(data['year'].keys())
         balances = [data['year'][month].get('balance', 0) for month in months]
         saldos = [data['year'][month].get('saldo', 0) for month in months]
-        avg_balance = sum(balances) / len(balances)
-        avg_saldo = sum(saldos) / len(saldos)
-        max_balance = max(balances)
-        min_balance = min(balances)
-        max_balance_month = months[balances.index(max_balance)]
-        min_balance_month = months[balances.index(min_balance)]
+        avg_balance = sum(balances) / len(balances) if balances else 0
+        avg_saldo = sum(saldos) / len(saldos) if saldos else 0
+        max_balance = max(balances) if balances else 0
+        min_balance = min(balances) if balances else 0
+        max_balance_month = months[balances.index(max_balance)] if balances else ""
+        min_balance_month = months[balances.index(min_balance)] if balances else ""
         total_income = sum(data['income'])
         total_expenses = sum(data['expenses'])
 
@@ -135,7 +139,17 @@ def report(bot: telebot, USER_ID: str):
             f'{_("balance_min_year", value=round(min_balance, 2), month=min_balance_month)}\n\n'
             f'{_("balance_total_year", value=round(sum(saldos), 2))}\n'
         )
+        
+        return caption
+    except Exception as e:
+        logging.error(f"Error in generate_report_data: {e}")
+        return None
 
+def report(bot: telebot, USER_ID: str):
+    try:
+        data = get_full_balance()
+        caption = generate_report_data(data)
+        
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption, parse_mode='Markdown'))
         try:
@@ -157,7 +171,7 @@ def report(bot: telebot, USER_ID: str):
 def balance_reset(bot, user_id):
     try:
         if not os.path.exists('data/balance.json'):
-            logging.error("Файл balance.json не существует")
+            logging.error("File balance.json doesn't exist")
             return
             
         with open('data/balance.json', 'r', encoding='utf-8') as file:
@@ -169,11 +183,11 @@ def balance_reset(bot, user_id):
         
         if current_month == "July" and "Jule" in data["year"]:
             current_month = "Jule"
-            
+        
         try:
             current_index = months.index(current_month)
         except ValueError:
-            logging.error(f"Не найден месяц {current_month} в файле баланса")
+            logging.error(f"The month {current_month} doesn't exist in the balance data")
             bot.send_message(user_id, _('balance_reset_month_not_found', month=current_month))
             return
             
@@ -181,27 +195,43 @@ def balance_reset(bot, user_id):
         prev_month = months[prev_index]
         
         prev_balance = data["year"][prev_month]["balance"]
+        caption = generate_report_data(data)
         
         data["year"][current_month]["balance"] = prev_balance
         data["year"][current_month]["saldo"] = 0
-        
         data["income"] = [0] * 31
         data["expenses"] = [0] * 31
         
         with open('data/balance.json', 'w', encoding='utf-8') as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
             
-        msg = f"*{_('balance_reset_title')}*\n\n"
-        msg += f"{_('balance_reset_message', value=prev_balance, month=prev_month)}\n"
-        msg += f"{_('balance_reset_saldo')}\n"
-        msg += f"{_('balance_reset_daily')}"
+        reset_info = (
+            f"*{_('balance_reset_title')}*\n\n"
+            f"{_('balance_reset_message', value=prev_balance, month=prev_month)}\n"
+            f"{_('balance_reset_saldo')}\n"
+            f"{_('balance_reset_daily')}\n\n"
+        )
         
-        bot.send_message(user_id, msg, parse_mode="Markdown")
-        logging.info(f"Баланс сброшен: {prev_month} -> {current_month}, balance: {prev_balance}")
+        full_caption = reset_info + caption
+        media = []
+        media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=full_caption, parse_mode='Markdown'))
         
+        try:
+            media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
+        except:
+            pass
+
+        bot.send_media_group(user_id, media)
+        os.remove('balance_plot.png')
+        try:
+            os.remove('income_expenses_plot.png')
+        except:
+            pass
+            
+        logging.info(f"Balance reset: {prev_month} -> {current_month}, balance: {prev_balance}")
         return True
         
     except Exception as e:
-        logging.error(f"Ошибка при сбросе баланса: {e}")
+        logging.error(f"Error during balance reset: {e}")
         bot.send_message(user_id, _('balance_reset_error', error=str(e)))
         return False

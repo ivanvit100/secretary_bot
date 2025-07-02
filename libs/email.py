@@ -480,10 +480,10 @@ def send_email_with_attachments(to_address: str, subject: str, body: str, attach
                     return True
             except Exception as starttls_error:
                 logging.error(f"STARTTLS connection failed: {starttls_error}")
-                raise Exception(f"Все методы подключения не сработали: {starttls_error}")
+                raise Exception(f"STARTTLS connection failed: {starttls_error}")
         except Exception as e:
             logging.error(f"SMTP error: {e}")
-            raise Exception(f"Ошибка при отправке почты: {str(e)}")
+            raise Exception(f"SMTP error: {str(e)}")
 
         logging.info('Email with attachments sent successfully')
         return True
@@ -513,7 +513,7 @@ def email_main(message: telebot.types.Message, bot: telebot.TeleBot, attachment:
         try:
             credentials = get_email_credentials(email_index)
         except ValueError as e:
-            bot.send_message(message.from_user.id, f"Ошибка конфигурации почты: {str(e)}")
+            bot.send_message(message.from_user.id, f"{_('email_config_error')}: {str(e)}")
             return
         
         if len(message_parts) < 2:
@@ -614,10 +614,10 @@ def send_email(to_address: str, subject: str, template_path: str, attachment_pat
                 server.send_message(msg)
         except socket.gaierror as e:
             logging.error(f"DNS resolution failed for SMTP server {credentials['smtp']}: {e}")
-            raise Exception(f"Не удалось подключиться к SMTP серверу: {str(e)}")
+            raise Exception(f"Error during connection to SMTP: {str(e)}")
         except Exception as e:
             logging.error(f"SMTP error: {e}")
-            raise Exception(f"Ошибка при отправке почты: {str(e)}")
+            raise Exception(f"Email error: {str(e)}")
 
         logging.info('Email sent successfully')
     except Exception as e:

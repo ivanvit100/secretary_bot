@@ -92,6 +92,7 @@ messages = {
     "email_read_error": "An error occurred while processing the message",
     "email_send_failed": "Failed to send email",
     "email_no_subject": "No subject",
+    "email_config_error": "Email config error",
 
     # File operations
     "file_saved": "File saved",

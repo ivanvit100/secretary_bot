@@ -57,7 +57,7 @@ def setup_secretary():
             "April": {"balance": 0, "saldo": 0},
             "May": {"balance": 0, "saldo": 0},
             "June": {"balance": 0, "saldo": 0},
-            "Jule": {"balance": 0, "saldo": 0},
+            "July": {"balance": 0, "saldo": 0},
             "August": {"balance": 0, "saldo": 0},
             "September": {"balance": 0, "saldo": 0},
             "October": {"balance": 0, "saldo": 0},

@@ -87,7 +87,7 @@ def everyday_job():
             logging.info('Statistic reset')
     
         clean_logs()
-        logging.info("Логи очищены")
+        logging.info("Logs cleared")
 
         message = f'*{_("daily_summary_title")}*\n\n'
         
@@ -153,7 +153,7 @@ def main():
         try:
             bot.infinity_polling(timeout=60, long_polling_timeout=60)
         except Exception as e:
-            logging.error(f"Ошибка: {e}")
+            logging.error(f"Error: {e}")
             time.sleep(15)
 
 #########################
