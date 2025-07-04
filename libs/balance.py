@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LinearRegression
+from telebot import types
 from libs.plots import *
 from i18n import _
 
@@ -26,8 +27,28 @@ def balance_main(message: telebot.types.Message, bot: telebot.TeleBot):
     else:
         try:
             new_balance = float(message_parts[1])
-            update_balance(new_balance)
-            bot.send_message(message.from_user.id, _('balance_updated', value=new_balance), parse_mode='Markdown')
+            if new_balance < 0:
+                update_balance(new_balance, 'uncategorized')
+                
+                markup = types.InlineKeyboardMarkup(row_width=2)
+                markup.add(
+                    types.InlineKeyboardButton(_("expense_important"), callback_data=f"expense_cat_important_{abs(new_balance)}"),
+                    types.InlineKeyboardButton(_("expense_unplanned"), callback_data=f"expense_cat_unplanned_{abs(new_balance)}")
+                )
+                markup.add(
+                    types.InlineKeyboardButton(_("expense_optional"), callback_data=f"expense_cat_optional_{abs(new_balance)}"),
+                    types.InlineKeyboardButton(_("expense_uncategorized"), callback_data=f"expense_cat_uncategorized_{abs(new_balance)}")
+                )
+                
+                bot.send_message(
+                    message.from_user.id, 
+                    _('expense_select_category', value=abs(new_balance)), 
+                    reply_markup=markup,
+                    parse_mode='Markdown'
+                )
+            else:
+                update_balance(new_balance)
+                bot.send_message(message.from_user.id, _('balance_updated', value=new_balance), parse_mode='Markdown')
         except ValueError:
             bot.send_message(message.from_user.id, _('balance_invalid_format'))
 
@@ -53,7 +74,7 @@ def get_full_balance():
         logging.error(f"Error in get_full_balance: {e}")
         raise
 
-def update_balance(new_balance: float):
+def update_balance(new_balance: float, category: str = None):
     try:
         with open(balance_file_path, 'r') as file:
             data = json.load(file)
@@ -63,13 +84,38 @@ def update_balance(new_balance: float):
 
         data['year'][month]['balance'] += new_balance
         data['year'][month]['saldo'] += new_balance
-        data['income'][day - 1] += new_balance if new_balance > 0 else 0
-        data['expenses'][day - 1] += -new_balance if new_balance < 0 else 0
+        
+        if new_balance > 0:
+            data['income'][day - 1] += new_balance
+        else:
+            expense = abs(new_balance)
+            data['expenses'][day - 1] += expense
+            
+            if category:
+                if 'categories' not in data:
+                    data['categories'] = {
+                        'important': 0,
+                        'unplanned': 0,
+                        'optional': 0,
+                        'uncategorized': 0
+                    }
+                
+                if 'categories' not in data['year'][month]:
+                    data['year'][month]['categories'] = {
+                        'important': 0,
+                        'unplanned': 0,
+                        'optional': 0,
+                        'uncategorized': 0
+                    }
+                
+                data['categories'][category] += expense
+                data['year'][month]['categories'][category] += expense
 
         with open(balance_file_path, 'w') as file:
-            json.dump(data, file, indent=4)
+            json.dump(data, file, indent=4, ensure_ascii=False)
 
-        logging.info("Balance updated")
+        logging.info(f"Balance updated: {new_balance}" + 
+                     (f", category: {category}" if category and new_balance < 0 else ""))
     except Exception as e:
         logging.error(f"Error in update_balance: {e}")
         raise
@@ -106,6 +152,7 @@ def generate_report_data(data):
     try:
         plot_balance(data)
         plot_income_expenses(data)
+        plot_categories(data)
         
         forecast_result = forecast_balance_and_saldo(data)
         if forecast_result:
@@ -114,6 +161,7 @@ def generate_report_data(data):
             forecast_balance_current = forecast_saldo_current = forecast_balance_next = forecast_saldo_next = 0
 
         months = list(data['year'].keys())
+        month = datetime.datetime.now().strftime('%B')
         balances = [data['year'][month].get('balance', 0) for month in months]
         saldos = [data['year'][month].get('saldo', 0) for month in months]
         avg_balance = sum(balances) / len(balances) if balances else 0
@@ -137,7 +185,7 @@ def generate_report_data(data):
             f'{_("balance_avg_saldo_year", value=round(avg_saldo, 2))}\n'
             f'{_("balance_max_year", value=round(max_balance, 2), month=max_balance_month)}\n'
             f'{_("balance_min_year", value=round(min_balance, 2), month=min_balance_month)}\n\n'
-            f'{_("balance_total_year", value=round(sum(saldos), 2))}\n'
+            f'{_("balance_total_year", value=round(sum(saldos), 2))}'
         )
         
         return caption
@@ -152,8 +200,14 @@ def report(bot: telebot, USER_ID: str):
         
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption, parse_mode='Markdown'))
+        
         try:
             media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
+        except:
+            pass
+            
+        try:
+            media.append(telebot.types.InputMediaPhoto(open('categories_plot.png', 'rb')))
         except:
             pass
 
@@ -162,6 +216,11 @@ def report(bot: telebot, USER_ID: str):
         os.remove('balance_plot.png')
         try:
             os.remove('income_expenses_plot.png')
+        except:
+            pass
+            
+        try:
+            os.remove('categories_plot.png')
         except:
             pass
     except Exception as e:
@@ -181,9 +240,6 @@ def balance_reset(bot, user_id):
         now = datetime.datetime.now()
         current_month = now.strftime("%B")
         
-        if current_month == "July" and "Jule" in data["year"]:
-            current_month = "Jule"
-        
         try:
             current_index = months.index(current_month)
         except ValueError:
@@ -193,12 +249,21 @@ def balance_reset(bot, user_id):
             
         prev_index = (current_index - 1) % 12
         prev_month = months[prev_index]
-        
         prev_balance = data["year"][prev_month]["balance"]
+        
         caption = generate_report_data(data)
         
         data["year"][current_month]["balance"] = prev_balance
         data["year"][current_month]["saldo"] = 0
+        
+        if 'categories' in data["year"][current_month]:
+            data["year"][current_month]["categories"] = {
+                'important': 0,
+                'unplanned': 0,
+                'optional': 0,
+                'uncategorized': 0
+            }
+        
         data["income"] = [0] * 31
         data["expenses"] = [0] * 31
         
@@ -209,24 +274,33 @@ def balance_reset(bot, user_id):
             f"*{_('balance_reset_title')}*\n\n"
             f"{_('balance_reset_message', value=prev_balance, month=prev_month)}\n"
             f"{_('balance_reset_saldo')}\n"
-            f"{_('balance_reset_daily')}\n\n"
+            f"{_('balance_reset_daily')}\n"
+            f"{_('balance_reset_categories')}\n\n"
         )
         
         full_caption = reset_info + caption
+        
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=full_caption, parse_mode='Markdown'))
         
         try:
             media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error adding income_expenses_plot: {e}")
+            
+        try:
+            media.append(telebot.types.InputMediaPhoto(open('categories_plot.png', 'rb')))
+        except Exception as e:
+            logging.error(f"Error adding categories_plot: {e}")
 
         bot.send_media_group(user_id, media)
-        os.remove('balance_plot.png')
+        
         try:
+            os.remove('balance_plot.png')
             os.remove('income_expenses_plot.png')
-        except:
-            pass
+            os.remove('categories_plot.png')
+        except Exception as e:
+            logging.error(f"Error removing plot files: {e}")
             
         logging.info(f"Balance reset: {prev_month} -> {current_month}, balance: {prev_balance}")
         return True
@@ -235,3 +309,70 @@ def balance_reset(bot, user_id):
         logging.error(f"Error during balance reset: {e}")
         bot.send_message(user_id, _('balance_reset_error', error=str(e)))
         return False
+    
+def init_categories():
+    try:
+        with open(balance_file_path, 'r') as file:
+            data = json.load(file)
+        
+        if 'categories' not in data:
+            data['categories'] = {
+                'important': 0,
+                'unplanned': 0,
+                'optional': 0,
+                'uncategorized': 0
+            }
+            
+            with open(balance_file_path, 'w') as file:
+                json.dump(data, file, indent=4, ensure_ascii=False)
+            logging.info("Expense categories initialized")
+        
+        for month in data['year']:
+            if 'categories' not in data['year'][month]:
+                data['year'][month]['categories'] = {
+                    'important': 0,
+                    'unplanned': 0,
+                    'optional': 0,
+                    'uncategorized': 0
+                }
+        
+        with open(balance_file_path, 'w') as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
+            
+    except Exception as e:
+        logging.error(f"Error initializing expense categories: {e}")
+
+def handle_expense_category(call: telebot.types.CallbackQuery, bot: telebot.TeleBot):
+    try:
+        parts = call.data.split('_')
+        category = parts[2]
+        amount = float(parts[3])
+        
+        if category != 'uncategorized':
+            with open(balance_file_path, 'r') as file:
+                data = json.load(file)
+                
+            month = datetime.datetime.now().strftime('%B')
+            
+            if 'categories' in data and 'categories' in data['year'][month]:
+                data['categories']['uncategorized'] -= amount
+                data['year'][month]['categories']['uncategorized'] -= amount
+                
+                data['categories'][category] += amount
+                data['year'][month]['categories'][category] += amount
+                
+                with open(balance_file_path, 'w') as file:
+                    json.dump(data, file, indent=4, ensure_ascii=False)
+        
+        category_name = _(f"expense_{category}")
+        bot.edit_message_text(
+            _('expense_category_selected', value=amount, category=category_name),
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown'
+        )
+        
+        bot.answer_callback_query(call.id, _('expense_category_saved'))
+    except Exception as e:
+        logging.error(f"Error handling expense category: {e}")
+        bot.answer_callback_query(call.id, _('error_occurred'))

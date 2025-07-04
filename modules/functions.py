@@ -100,6 +100,10 @@ def main():
     def local_check(user_id):
         return check(user_id, bot)
     
+    if config.MODULES["balance"]:
+        from libs.balance import init_categories
+        init_categories()
+    
     register_callbacks(bot, local_check)
     register_handlers(bot, local_check)
     register_keyboard(bot, local_check)

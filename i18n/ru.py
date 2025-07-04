@@ -83,6 +83,20 @@ messages = {
     "balance_reset_month_not_found": "Ошибка: месяц {month} не найден в файле баланса",
     "balance_reset_error": "Произошла ошибка при сбросе баланса: {error}",
 
+    # Категории баланса
+    "expense_select_category": "Выберите категорию для расхода {value}:",
+    "expense_important": "Важные",
+    "expense_unplanned": "Незапланированные",
+    "expense_optional": "Необязательные", 
+    "expense_uncategorized": "Без категории",
+    "expense_category_selected": "Расход {value} добавлен в категорию {category}",
+    "expense_category_saved": "Категория сохранена",
+    "expense_categories_title": "Расходы по категориям:",
+    "expense_categories_chart_title": "Расходы по категориям по месяцам",
+    "balance_reset_categories": "Категории расходов сброшены",
+    "months": "Месяца",
+    "amount": "Сумма",
+
     # Email сообщения
     "email_no_messages": "Нет новых сообщений",
     "email_list_title": "Список последних сообщений для {email}",

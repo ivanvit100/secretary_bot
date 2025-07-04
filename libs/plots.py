@@ -89,3 +89,45 @@ def mounth_plot(data: dict):
     except Exception as e:
         logging.error(f"Error in mounth_plot: {e}")
         raise
+
+def plot_categories(data):
+    try:
+        months = list(data['year'].keys())
+        important = []
+        unplanned = []
+        optional = []
+        uncategorized = []
+        
+        for month in months:
+            if 'categories' in data['year'][month]:
+                important.append(data['year'][month]['categories'].get('important', 0))
+                unplanned.append(data['year'][month]['categories'].get('unplanned', 0))
+                optional.append(data['year'][month]['categories'].get('optional', 0))
+                uncategorized.append(data['year'][month]['categories'].get('uncategorized', 0))
+            else:
+                important.append(0)
+                unplanned.append(0)
+                optional.append(0)
+                uncategorized.append(0)
+        
+        plt.figure(figsize=(12, 6))
+        plt.bar(months, important, label=_('expense_important'))
+        plt.bar(months, unplanned, bottom=important, label=_('expense_unplanned'))
+        plt.bar(months, optional, bottom=[i+u for i, u in zip(important, unplanned)], label=_('expense_optional'))
+        plt.bar(months, uncategorized, 
+                bottom=[i+u+o for i, u, o in zip(important, unplanned, optional)], 
+                label=_('expense_uncategorized'))
+        
+        plt.xlabel(_('months'))
+        plt.ylabel(_('amount'))
+        plt.title(_('expense_categories_chart_title'))
+        plt.legend()
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        plt.savefig('categories_plot.png')
+        plt.close()
+        
+    except Exception as e:
+        logging.error(f"Error creating categories plot: {e}")

@@ -83,6 +83,20 @@ messages = {
     "balance_reset_month_not_found": "Error: month {month} not found in balance file",
     "balance_reset_error": "An error occurred during balance reset: {error}",
 
+    # Balance categories
+    "expense_select_category": "Choose category for {value}:",
+    "expense_important": "Important",
+    "expense_unplanned": "Unplanned",
+    "expense_optional": "Optional", 
+    "expense_uncategorized": "Uncategorized",
+    "expense_category_selected": "Expense {value} added to category {category}",
+    "expense_category_saved": "Category saved",
+    "expense_categories_title": "Expenses by category:",
+    "expense_categories_chart_title": "Expenses by category by month",
+    "balance_reset_categories": "Expenses category cleared",
+    "months": "Months",
+    "amount": "Amount",
+
     # Email messages
     "email_no_messages": "No new messages",
     "email_list_title": "List of recent messages for {email}",

@@ -13,6 +13,17 @@ def register_callbacks(bot, check_function):
     def check(user_id):
         return check_function(user_id)
 
+    if config.MODULES["balance"]:
+        from libs.balance import (
+            handle_expense_category
+        )
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith('expense_cat_'))
+        def expense_category_callback(call):
+            if not check(call.from_user.id):
+                return
+            handle_expense_category(call, bot)
+
     if config.MODULES["email"]:
         from libs.email import (
             email_read, 
