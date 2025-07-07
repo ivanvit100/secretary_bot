@@ -13,36 +13,40 @@ def show_main_menu(message_or_call, bot):
     try:
         if isinstance(message_or_call, telebot.types.CallbackQuery):
             message = message_or_call.message
+            user_id = message_or_call.from_user.id
             bot.answer_callback_query(message_or_call.id)
         else:
             message = message_or_call
+            user_id = message.from_user.id
         
+        from libs.users import check_permission
+        import os
+        
+        is_admin = str(user_id) == os.getenv('USER_ID')
         markup = types.InlineKeyboardMarkup(row_width=2)
         buttons = []
         
-        if config.MODULES["notification"]:
-            buttons.append(types.InlineKeyboardButton(_("menu_notifications_button"), callback_data="menu_notifications"))
-        
-        if config.MODULES["task"]:
-            buttons.append(types.InlineKeyboardButton(_("menu_tasks_button"), callback_data="menu_tasks"))
-        
-        if config.MODULES["email"]:
-            buttons.append(types.InlineKeyboardButton(_("menu_email_button"), callback_data="menu_email"))
-        
-        if config.MODULES["balance"]:
+        if config.MODULES["balance"] and check_permission(user_id, bot, "balance", silent=True):
             buttons.append(types.InlineKeyboardButton(_("menu_balance_button"), callback_data="menu_balance"))
             buttons.append(types.InlineKeyboardButton(_("menu_report_button"), callback_data="menu_report"))
-        
-        if config.MODULES["vps"]:
-            buttons.append(types.InlineKeyboardButton(_("menu_vps_button"), callback_data="menu_vps"))
-        
+        if config.MODULES["task"] and check_permission(user_id, bot, "task", silent=True):
+            buttons.append(types.InlineKeyboardButton(_("menu_tasks_button"), callback_data="menu_tasks"))
+        if config.MODULES["notification"] and check_permission(user_id, bot, "notification", silent=True):
+            buttons.append(types.InlineKeyboardButton(_("menu_notifications_button"), callback_data="menu_notifications"))
         if config.MODULES["files"]:
             buttons.append(types.InlineKeyboardButton(_("menu_files_button"), callback_data="menu_files"))
+        if config.MODULES["email"] and check_permission(user_id, bot, "email", silent=True):
+            buttons.append(types.InlineKeyboardButton(_("menu_email_button"), callback_data="menu_email"))
+        if config.MODULES["vps"] and check_permission(user_id, bot, "vps", silent=True):
+            buttons.append(types.InlineKeyboardButton(_("menu_vps_button"), callback_data="menu_vps"))
         
-        buttons.append(types.InlineKeyboardButton(_("menu_log_button"), callback_data="menu_log"))
-        
-        if config.MODULES["support"]:
-            buttons.append(types.InlineKeyboardButton(_("menu_ssh_button"), callback_data="menu_ssh"))
+        if is_admin:
+            buttons.append(types.InlineKeyboardButton(_("menu_log_button"), callback_data="menu_log"))
+            
+            if config.MODULES["support"]:
+                buttons.append(types.InlineKeyboardButton(_("menu_ssh_button"), callback_data="menu_ssh"))
+            
+            buttons.append(types.InlineKeyboardButton(_("menu_permissions_button"), callback_data="menu_permissions"))
         
         for i in range(0, len(buttons), 2):
             if i + 1 < len(buttons):
@@ -145,7 +149,7 @@ def handle_menu_callback(call, bot):
             bot.answer_callback_query(call.id)
             if config.MODULES["notification"]:
                 from libs.notification import schedule_list
-                schedule_list(bot)
+                schedule_list(bot, call.from_user.id)
         elif callback_data == "menu_notification_add":
             bot.answer_callback_query(call.id)
             if config.MODULES["notification"]:
@@ -506,44 +510,80 @@ def handle_menu_callback(call, bot):
             msg = bot.send_message(call.message.chat.id, _("menu_ssh_enter_command"))
             ssh_mode_users[call.from_user.id] = msg.message_id
         
+        # Разрешения
+        elif callback_data == "menu_permissions":
+            bot.answer_callback_query(call.id)
+            try:
+                from libs.users import list_users
+                list_users(call.from_user.id, bot)
+            except Exception as e:
+                logging.error(f"Error handling permissions: {e}")
+                bot.send_message(call.message.chat.id, _("menu_permissions_error").format(error=e))
+        
     except Exception as e:
         logging.error(f"Error in handle_menu_callback: {e}")
         bot.answer_callback_query(call.id, text=_("error_occurred"))
 
 # Keyboard
-def show_reply_keyboard(message_or_user_id, bot):
-    if isinstance(message_or_user_id, telebot.types.Message):
-        user_id = message_or_user_id.chat.id
-    else:
-        user_id = message_or_user_id
+def show_reply_keyboard(message_or_user_id=None, bot=None):
+    from libs.users import check_permission
+    import os
+
+    def send_keyboard_to_user(user_id, bot):
+        keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+        buttons = []
+        
+        if config.MODULES["balance"] and check_permission(user_id, bot, "balance", silent=True):
+            buttons.append(types.KeyboardButton(_("keyboard_balance")))
+        if config.MODULES["task"] and check_permission(user_id, bot, "task", silent=True):
+            buttons.append(types.KeyboardButton(_("keyboard_tasks")))
+        if config.MODULES["notification"] and check_permission(user_id, bot, "notification", silent=True):
+            buttons.append(types.KeyboardButton(_("keyboard_notifications")))
+        if config.MODULES["email"] and check_permission(user_id, bot, "email", silent=True):
+            buttons.append(types.KeyboardButton(_("keyboard_email")))
+        
+        buttons.append(types.KeyboardButton(_("keyboard_menu")))
+
+        for i in range(0, len(buttons), 2):
+            if i + 1 < len(buttons):
+                keyboard.row(buttons[i], buttons[i+1])
+            else:
+                keyboard.row(buttons[i])
+        
+        try:
+            bot.send_message(
+                user_id,
+                _("secretary_started"),
+                reply_markup=keyboard
+            )
+            logging.info(f"Keyboard sent to user {user_id}")
+            return True
+        except Exception as e:
+            logging.error(f"Error sending keyboard to user {user_id}: {e}")
+            return False
+
+    if message_or_user_id:
+        user_id = message_or_user_id.chat.id if isinstance(message_or_user_id, telebot.types.Message) else message_or_user_id
+        return send_keyboard_to_user(user_id, bot)
     
-    keyboard = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    buttons = []
+    USER_PREFIX = "USER_"
+    main_user_id = os.getenv('USER_ID')
     
-    if config.MODULES["files"]:
-        buttons.append(types.KeyboardButton(_("keyboard_files")))
-    if config.MODULES["email"]:
-        buttons.append(types.KeyboardButton(_("keyboard_email")))
-    if config.MODULES["balance"]:
-        buttons.append(types.KeyboardButton(_("keyboard_balance")))
-    if config.MODULES["task"]:
-        buttons.append(types.KeyboardButton(_("keyboard_tasks")))
-    if config.MODULES["notification"]:
-        buttons.append(types.KeyboardButton(_("keyboard_notifications")))
-    if config.MODULES["vps"]:
-        buttons.append(types.KeyboardButton(_("keyboard_vps")))
+    if main_user_id:
+        send_keyboard_to_user(main_user_id, bot)
     
-    for i in range(0, len(buttons), 2):
-        if i + 1 < len(buttons):
-            keyboard.row(buttons[i], buttons[i+1])
-        else:
-            keyboard.row(buttons[i])
+    success_count = 0
+    error_count = 0
     
-    bot.send_message(
-        user_id,
-        _("secretary_started"),
-        reply_markup=keyboard
-    )
+    for key, value in os.environ.items():
+        if key.startswith(USER_PREFIX) and key != "USER_ID":
+            user_id = key[len(USER_PREFIX):]
+            if send_keyboard_to_user(user_id, bot):
+                success_count += 1
+            else:
+                error_count += 1
+    
+    logging.info(f"Keyboard sent to {success_count} users, failed for {error_count} users")
 
 def handle_keyboard_files(message, bot):
     if config.MODULES["files"]:

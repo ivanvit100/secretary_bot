@@ -321,6 +321,7 @@ messages = {
     "menu_files_button": "📁 Files",
     "menu_log_button": "📜 Log",
     "menu_ssh_button": "🔧 SSH",
+    "menu_permissions_button": "🔐 Permissions",
     "menu_notification_list_button": "📋 Notification List",
     "menu_notification_add_button": "➕ Add Notification",
     "menu_back_button": "⬅️ Back",
@@ -347,11 +348,33 @@ messages = {
     "menu_vps_error": "Error retrieving VPS statistics: {error}",
 
     # Keyboard
-    "keyboard_files": "📁 Files",
     "keyboard_email": "📧 Email",
     "keyboard_balance": "💰 Balance",
     "keyboard_tasks": "📝 Tasks",
     "keyboard_notifications": "🔔 Notifications",
-    "keyboard_vps": "🖥️ VPS",
-    "keyboard_hide": "❌ Hide Keyboard",
+    "keyboard_menu": "🏠 Main menu",
+
+    # Permissions
+    "no_permission": "You don't have access to this bot",
+    "no_permission_module": "You don't have access to the module {module}",
+    "admin_required": "This command is available only to administrator",
+    "user_added": "User with ID {user_id} ({name}) has been successfully added",
+    "user_removed": "User with ID {user_id} ({name}) has been successfully removed",
+    "user_not_found": "User with ID {user_id} not found",
+    "module_not_found": "Module {module} not found",
+    "permission_updated": "Permissions for user {user} (ID: {user_id}) for module {module} {status}",
+    "enabled": "enabled",
+    "disabled": "disabled",
+    "users_list_title": "📋 Users List",
+    "main_admin": "Administrator",
+    "permissions": "Access permissions",
+    "user_command_help": "Command format:\n/user add <user_id> <name> - add a user\n/user remove <user_id> - remove a user\n/user permission <user_id> <module> <true/false> - set permission\n/user list - show users list",
+    
+    # Module names
+    "module_balance": "Balance",
+    "module_notification": "Notifications",
+    "module_task": "Tasks",
+    "module_email": "Email",
+    "module_files": "Files",
+    "module_vps": "VPS",
 }

@@ -153,7 +153,10 @@ def cancel_scheduled_message(index: int):
         logging.warning(i18n._("notification_invalid_index", index=index))
         return False
 
-def schedule_list(bot: telebot.TeleBot, page: int = 0):
+def schedule_list(bot: telebot.TeleBot, user_id=None, page: int = 0):
+    if user_id is None:
+        user_id = USER_ID
+    
     if scheduled_jobs:
         notifications_per_page = 8
         total_pages = max(1, math.ceil(len(scheduled_jobs) / notifications_per_page))
@@ -201,13 +204,13 @@ def schedule_list(bot: telebot.TeleBot, page: int = 0):
             message_text += f"\n_{i18n._('page')} {page + 1} {i18n._('of')} {total_pages}_"
         
         bot.send_message(
-            USER_ID,
+            user_id,
             message_text, 
             parse_mode="Markdown",
             reply_markup=markup
         )
     else:
-        bot.send_message(USER_ID, i18n._("notification_list_empty"))
+        bot.send_message(user_id, i18n._("notification_list_empty"))
 
 def get_notifications_for_date(date_str=None):
     if date_str is None:

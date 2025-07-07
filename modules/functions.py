@@ -24,12 +24,9 @@ USER_ID = os.getenv('USER_ID')
 #                       #
 #########################
 
-def check(id, bot):
-    if (id == int(USER_ID)):
-        return True
-    else:
-        bot.send_message(id, _('no_permission'))
-        return False
+def check(id, bot, module=None):
+    from libs.users import check_permission
+    return check_permission(id, bot, module)
 
 def everyday_job(bot):
     try:
@@ -97,8 +94,8 @@ def main():
     if not os.path.exists('data'):
         os.makedirs('data')
 
-    def local_check(user_id):
-        return check(user_id, bot)
+    def local_check(user_id, module=None):
+        return check(user_id, bot, module)
     
     if config.MODULES["balance"]:
         from libs.balance import init_categories
@@ -123,7 +120,7 @@ def main():
         from libs.notification import init_notifications
         init_notifications(bot)
     
-    libs.menu.show_reply_keyboard(USER_ID, bot)
+    libs.menu.show_reply_keyboard(bot=bot)
     logging.info('Secretary bot started')
     
     everyday_job(bot)

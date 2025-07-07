@@ -10,8 +10,8 @@ from libs.notification import user_states
 
 def register_callbacks(bot, check_function):
     
-    def check(user_id):
-        return check_function(user_id)
+    def check(user_id, module=None):
+        return check_function(user_id, module)
 
     if config.MODULES["balance"]:
         from libs.balance import (
@@ -274,5 +274,45 @@ def register_callbacks(bot, check_function):
     def menu_callback_handler(call):
         if not check(call.from_user.id):
             return
+
+        menu_action = call.data.split('_')[1] if len(call.data.split('_')) > 1 else ""
+        module_mapping = {
+            "email": "email",
+            "files": "files", 
+            "balance": "balance",
+            "report": "balance",
+            "tasks": "task",
+            "notifications": "notification",
+            "stats": "vps",
+            "ssh": "vps",
+            "log": "vps",
+            "vps": "vps"
+        }
+
+        if menu_action == "files":
+            from libs.users import check_permission
+            from libs.files import show_files
+
+            has_access = check_permission(call.from_user.id, bot, "files", silent=True)
+            bot.send_chat_action(call.message.chat.id, 'typing')
+
+            if not has_access:
+                import copy
+                file_call = copy.copy(call)
+                file_call.data = "file_page_0_0"
+                show_files(file_call, bot)
+            else:
+                handle_menu_callback(call, bot)
+
+            return
+
+        elif menu_action in module_mapping:
+            module = module_mapping[menu_action]
+
+            from libs.users import check_permission
+            if not check_permission(call.from_user.id, bot, module, silent=True):
+                bot.answer_callback_query(call.id, _('no_permission_module', module=_(f'module_{module}')))
+                return
+
         bot.send_chat_action(call.message.chat.id, 'typing')
         handle_menu_callback(call, bot)
