@@ -1,4 +1,5 @@
 import config
+import logging
 from i18n import _
 from libs.notification import user_states
 
@@ -316,3 +317,43 @@ def register_callbacks(bot, check_function):
 
         bot.send_chat_action(call.message.chat.id, 'typing')
         handle_menu_callback(call, bot)
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith('users_page_'))
+        def users_page_callback(call):
+            if not check(call.from_user.id):
+                return
+            try:
+                page = int(call.data.split('_')[2])
+                from libs.users import list_users
+                list_users(call.from_user.id, bot, page)
+            except Exception as e:
+                logging.error(f"Error in users_page_callback: {e}")
+                bot.answer_callback_query(call.id, _('error_occurred'))
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith('user_info_'))
+        def user_info_callback(call):
+            if not check(call.from_user.id):
+                return
+            try:
+                user_id = call.data.split('_')[2]
+                from libs.users import show_user_info
+                show_user_info(call.from_user.id, user_id, bot)
+            except Exception as e:
+                logging.error(f"Error in user_info_callback: {e}")
+                bot.answer_callback_query(call.id, _('error_occurred'))
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith('toggle_perm_'))
+        def toggle_permission_callback(call):
+            if not check(call.from_user.id):
+                return
+            try:
+                parts = call.data.split('_')
+                user_id = parts[2]
+                module = parts[3]
+                new_state = parts[4] == "1"
+
+                from libs.users import toggle_permission
+                toggle_permission(call.from_user.id, user_id, module, new_state, bot)
+            except Exception as e:
+                logging.error(f"Error in toggle_permission_callback: {e}")
+                bot.answer_callback_query(call.id, _('error_occurred'))

@@ -515,7 +515,7 @@ def handle_menu_callback(call, bot):
             bot.answer_callback_query(call.id)
             try:
                 from libs.users import list_users
-                list_users(call.from_user.id, bot)
+                list_users(call.from_user.id, bot, 0)
             except Exception as e:
                 logging.error(f"Error handling permissions: {e}")
                 bot.send_message(call.message.chat.id, _("menu_permissions_error").format(error=e))

@@ -346,6 +346,15 @@ messages = {
     "menu_log_error": "Error retrieving logs: {error}",
     "menu_tasks_error": "Error retrieving task list: {error}",
     "menu_vps_error": "Error retrieving VPS statistics: {error}",
+    "admin_info": "Admin Information",
+    "user_info": "User Information",
+    "name": "Name",
+    "back_to_users": "◀️ Back to Users",
+    "no_users_found": "Users not found",
+    "page": "Page",
+    "of": "of",
+    "prev_page": "⬅️ Back",
+    "next_page": "Next ➡️",
 
     # Keyboard
     "keyboard_email": "📧 Email",
@@ -368,6 +377,10 @@ messages = {
     "users_list_title": "📋 Users List",
     "main_admin": "Administrator",
     "permissions": "Access permissions",
+    "user_not_found": "User ID {user_id} not found",
+    "telegram_first_name": "Telegram name",
+    "telegram_username": "Username",
+    "telegram_link": "Link to profile",
     "user_command_help": "Command format:\n/user add <user_id> <name> - add a user\n/user remove <user_id> - remove a user\n/user permission <user_id> <module> <true/false> - set permission\n/user list - show users list",
     
     # Module names
