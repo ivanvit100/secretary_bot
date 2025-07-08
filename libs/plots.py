@@ -15,23 +15,58 @@ def plot_balance(data: dict):
 
         balances = np.nan_to_num(balances)
         saldos = np.nan_to_num(saldos)
-
-        plt.figure(figsize=(10, 5))
-        plt.plot(months, balances, label=_('plot_balance_label'), marker='o')
-        plt.plot(months, saldos, label=_('plot_saldo_label'), marker='o')
-        plt.xlabel(_('plot_month_label'))
-        plt.ylabel(_('plot_amount_label'))
-        plt.title(_('plot_balance_title'))
-        plt.legend()
-        plt.grid(True)
-        plt.xticks(rotation=25)
-
-        plt.savefig('balance_plot.png')
-        plt.close()
-        logging.info(_("plot_balance_saved"))
+        
+        if len(balances) > 0 and len(saldos) > 0:
+            min_saldo = np.min(saldos)
+            max_balance = np.max(balances)
+            separate_graphs = (max_balance - min_saldo) > 100000
+        else:
+            separate_graphs = False
+        
+        if separate_graphs:
+            plt.figure(figsize=(10, 5))
+            plt.plot(months, balances, label=_('plot_balance_label'), marker='o', color='blue')
+            plt.xlabel(_('plot_month_label'))
+            plt.ylabel(_('plot_amount_label'))
+            plt.title(_('plot_balance_title_only'))
+            plt.grid(True)
+            plt.xticks(rotation=25)
+            plt.tight_layout()
+            plt.savefig('balance_plot.png')
+            plt.close()
+            
+            plt.figure(figsize=(10, 5))
+            plt.plot(months, saldos, label=_('plot_saldo_label'), marker='o', color='green')
+            plt.xlabel(_('plot_month_label'))
+            plt.ylabel(_('plot_amount_label'))
+            plt.title(_('plot_saldo_title_only'))
+            plt.grid(True)
+            plt.xticks(rotation=25)
+            plt.tight_layout()
+            plt.savefig('saldo_plot.png')
+            plt.close()
+            
+            logging.info(_("plot_separate_balance_saldo_saved"))
+        else:
+            plt.figure(figsize=(10, 5))
+            plt.plot(months, balances, label=_('plot_balance_label'), marker='o')
+            plt.plot(months, saldos, label=_('plot_saldo_label'), marker='o')
+            plt.xlabel(_('plot_month_label'))
+            plt.ylabel(_('plot_amount_label'))
+            plt.title(_('plot_balance_title'))
+            plt.legend()
+            plt.grid(True)
+            plt.xticks(rotation=25)
+            plt.tight_layout()
+            plt.savefig('balance_plot.png')
+            plt.close()
+            logging.info(_("plot_balance_saved"))
+        
+        return separate_graphs
+        
     except Exception as e:
         logging.error(f"Error in plot_balance: {e}")
-        raise
+        return False
 
 def plot_income_expenses(data: dict):
     try:

@@ -238,6 +238,9 @@ messages = {
     "plot_zero_income_expenses": "И доходы, и расходы равны нулю. Пропуск создания круговой диаграммы.",
     "plot_invalid_data": "Доходы и расходы должны быть списками",
     "plot_month_saved": "График за месяц сохранен как month_plot.png",
+    "plot_balance_title_only": "Баланс по месяцам",
+    "plot_saldo_title_only": "Сальдо по месяцам",
+    "plot_separate_balance_saldo_saved": "Графики баланса и сальдо сохранены отдельно",
 
     # SSH и команды
     "ssh_sudo_forbidden": "Использование команды 'sudo' запрещено.",
@@ -379,6 +382,18 @@ messages = {
     "telegram_username": "Имя пользователя",
     "telegram_link": "Ссылка на профиль",
     "user_command_help": "Формат команды:\n/user add <user_id> <name> - добавить пользователя\n/user remove <user_id> - удалить пользователя\n/user permission <user_id> <module> <true/false> - установить разрешение\n/user list - показать список пользователей",
+    "add_new_user": "➕ Добавить пользователя",
+    "enter_user_id": "Введите ID пользователя:",
+    "enter_user_name": "Введите имя пользователя:",
+    "invalid_user_id": "Неверный формат ID пользователя. ID должен быть числом.",
+    "invalid_user_name": "Имя пользователя не может быть пустым.",
+    "user_already_exists": "Пользователь с таким ID уже существует.",
+    "confirm_add_user": "Добавить пользователя?\n\nID: `{user_id}`\nИмя: {name}",
+    "user_added_success": "✅ Пользователь добавлен успешно!\nID: `{user_id}`\nИмя: {name}",
+    "error_adding_user": "❌ Ошибка при добавлении пользователя: {error}",
+    "cancel": "Отмена",
+    "confirm": "Подтвердить",
+    "try_again": "Попробовать снова",
 
     # Названия модулей
     "module_balance": "Баланс",

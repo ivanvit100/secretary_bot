@@ -325,7 +325,7 @@ def register_callbacks(bot, check_function):
             try:
                 page = int(call.data.split('_')[2])
                 from libs.users import list_users
-                list_users(call.from_user.id, bot, page)
+                list_users(call.from_user.id, bot, page, call)
             except Exception as e:
                 logging.error(f"Error in users_page_callback: {e}")
                 bot.answer_callback_query(call.id, _('error_occurred'))
@@ -357,3 +357,24 @@ def register_callbacks(bot, check_function):
             except Exception as e:
                 logging.error(f"Error in toggle_permission_callback: {e}")
                 bot.answer_callback_query(call.id, _('error_occurred'))
+        
+        @bot.callback_query_handler(func=lambda call: call.data == 'add_new_user')
+        def add_new_user_callback(call):
+            if not check(call.from_user.id):
+                return
+            from libs.users import start_add_user
+            start_add_user(call, bot)
+
+        @bot.callback_query_handler(func=lambda call: call.data == 'cancel_add_user')
+        def cancel_add_user_callback(call):
+            if not check(call.from_user.id):
+                return
+            from libs.users import cancel_add_user
+            cancel_add_user(call, bot)
+
+        @bot.callback_query_handler(func=lambda call: call.data.startswith('confirm_add_user_'))
+        def confirm_add_user_callback(call):
+            if not check(call.from_user.id):
+                return
+            from libs.users import confirm_add_user
+            confirm_add_user(call, bot)

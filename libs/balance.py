@@ -150,7 +150,6 @@ def forecast_balance_and_saldo(data: dict):
 
 def generate_report_data(data):
     try:
-        plot_balance(data)
         plot_income_expenses(data)
         plot_categories(data)
         
@@ -196,24 +195,37 @@ def generate_report_data(data):
 def report(bot: telebot, USER_ID: str):
     try:
         data = get_full_balance()
+        separate_graphs = plot_balance(data)
         caption = generate_report_data(data)
         
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=caption, parse_mode='Markdown'))
         
+        if separate_graphs:
+            try:
+                media.append(telebot.types.InputMediaPhoto(open('saldo_plot.png', 'rb')))
+            except Exception as e:
+                logging.error(f"Error adding saldo plot: {e}")
+        
         try:
             media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error adding income expenses plot: {e}")
             
         try:
             media.append(telebot.types.InputMediaPhoto(open('categories_plot.png', 'rb')))
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error adding categories plot: {e}")
 
         bot.send_media_group(USER_ID, media)
 
         os.remove('balance_plot.png')
+        if separate_graphs:
+            try:
+                os.remove('saldo_plot.png')
+            except:
+                pass
+            
         try:
             os.remove('income_expenses_plot.png')
         except:
@@ -240,6 +252,9 @@ def balance_reset(bot, user_id):
         now = datetime.datetime.now()
         current_month = now.strftime("%B")
         
+        if current_month == "July" and "Jule" in data["year"]:
+            current_month = "Jule"
+        
         try:
             current_index = months.index(current_month)
         except ValueError:
@@ -252,6 +267,7 @@ def balance_reset(bot, user_id):
         prev_balance = data["year"][prev_month]["balance"]
         
         caption = generate_report_data(data)
+        separate_graphs = plot_balance(data)
         
         data["year"][current_month]["balance"] = prev_balance
         data["year"][current_month]["saldo"] = 0
@@ -283,6 +299,12 @@ def balance_reset(bot, user_id):
         media = []
         media.append(telebot.types.InputMediaPhoto(open('balance_plot.png', 'rb'), caption=full_caption, parse_mode='Markdown'))
         
+        if separate_graphs:
+            try:
+                media.append(telebot.types.InputMediaPhoto(open('saldo_plot.png', 'rb')))
+            except Exception as e:
+                logging.error(f"Error adding saldo plot: {e}")
+        
         try:
             media.append(telebot.types.InputMediaPhoto(open('income_expenses_plot.png', 'rb')))
         except Exception as e:
@@ -297,8 +319,23 @@ def balance_reset(bot, user_id):
         
         try:
             os.remove('balance_plot.png')
-            os.remove('income_expenses_plot.png')
-            os.remove('categories_plot.png')
+            
+            if separate_graphs:
+                try:
+                    os.remove('saldo_plot.png')
+                except Exception as e:
+                    logging.error(f"Error removing saldo plot: {e}")
+            
+            try:
+                os.remove('income_expenses_plot.png')
+            except Exception as e:
+                logging.error(f"Error removing income_expenses_plot: {e}")
+                
+            try:
+                os.remove('categories_plot.png')
+            except Exception as e:
+                logging.error(f"Error removing categories_plot: {e}")
+                
         except Exception as e:
             logging.error(f"Error removing plot files: {e}")
             

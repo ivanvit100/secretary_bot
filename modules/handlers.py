@@ -318,6 +318,16 @@ def register_handlers(bot, check_function):
     def menu_command(message: telebot.types.Message):
         bot.send_chat_action(message.chat.id, 'typing')
         libs.menu.menu(message, bot)    
+    
+    @bot.message_handler(func=lambda message: message.from_user.id in libs.users.add_user_states and libs.users.add_user_states[message.from_user.id]['state'] == libs.users.AddUserState.WAITING_FOR_ID)
+    def add_user_id_handler(message):
+        from libs.users import handle_add_user_id
+        handle_add_user_id(message, bot)
+    
+    @bot.message_handler(func=lambda message: message.from_user.id in libs.users.add_user_states and libs.users.add_user_states[message.from_user.id]['state'] == libs.users.AddUserState.WAITING_FOR_NAME)
+    def add_user_name_handler(message):
+        from libs.users import handle_add_user_name
+        handle_add_user_name(message, bot)
 
     from libs.users import add_user, remove_user, set_permission, list_users
     @bot.message_handler(commands=['user'])

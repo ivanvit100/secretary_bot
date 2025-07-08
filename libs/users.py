@@ -1,5 +1,6 @@
 import os
 import math
+import time
 import config
 import logging
 from dotenv import load_dotenv, find_dotenv, set_key
@@ -9,6 +10,12 @@ from i18n import _
 USER_PREFIX = "USER_"
 PERM_PREFIX = "PERM_"
 USER_ID = os.getenv('USER_ID')
+
+add_user_states = {}
+
+class AddUserState:
+    WAITING_FOR_ID = 1
+    WAITING_FOR_NAME = 2
 
 def check_permission(user_id, bot, module=None, silent=False):
     user_id = str(user_id)
@@ -119,7 +126,7 @@ def set_permission(admin_id, user_id, module, value, bot):
     load_user_env()
     return True
 
-def list_users(admin_id, bot, page=0):
+def list_users(admin_id, bot, page=0, call=None):
     admin_id = str(admin_id)
     USER_ID = os.getenv('USER_ID')
     
@@ -134,13 +141,12 @@ def list_users(admin_id, bot, page=0):
             name = value
             users.append({"id": user_id, "name": name})
     
-    if not users:
-        bot.send_message(admin_id, _('no_users_found'))
-        return False
-    
     message = f"*{_('admin_info')}*\n"
     message += f"ID: `{USER_ID}`\n\n"
-    message += f"*{_('users_list_title')}:*\n"
+    message += f"*{_('users_list_title')}*\n"
+    
+    if not users:
+        message += _('no_users_found') + "\n"
     
     users_per_page = 8
     total_pages = max(1, math.ceil(len(users) / users_per_page))
@@ -177,13 +183,36 @@ def list_users(admin_id, bot, page=0):
     if nav_buttons:
         markup.row(*nav_buttons)
     
+    markup.add(types.InlineKeyboardButton(_("add_new_user"), callback_data="add_new_user"))
     markup.add(types.InlineKeyboardButton(_("menu_back_button"), callback_data="menu_main"))
     
     if total_pages > 1:
         message += f"\n_{_('page')} {page + 1} {_('of')} {total_pages}_"
     
-    bot.send_message(admin_id, message, parse_mode="Markdown", reply_markup=markup)
-    return True
+    if call:
+        try:
+            bot.edit_message_text(
+                message,
+                chat_id=int(admin_id),
+                message_id=call.message.message_id,
+                parse_mode="Markdown",
+                reply_markup=markup
+            )
+            return True
+        except Exception as e:
+            logging.error(f"Error editing message: {e}")
+    
+    try:
+        bot.send_message(
+            admin_id, 
+            message, 
+            parse_mode="Markdown", 
+            reply_markup=markup
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Error sending users list: {e}")
+        return False
 
 def show_user_info(admin_id, user_id, bot):
     admin_id = str(admin_id)
@@ -277,3 +306,175 @@ def toggle_permission(admin_id, user_id, module, new_state, bot):
     
     load_dotenv(find_dotenv(), override=True)
     return show_user_info(admin_id, user_id, bot)
+
+def start_add_user(call, bot):
+    admin_id = call.from_user.id
+    USER_ID = os.getenv('USER_ID')
+    
+    if str(admin_id) != USER_ID:
+        bot.answer_callback_query(call.id, _('admin_required'))
+        return False
+    
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user'))
+    
+    msg = bot.edit_message_text(
+        _('enter_user_id'),
+        call.message.chat.id, 
+        call.message.message_id,
+        reply_markup=markup
+    )
+    
+    add_user_states[admin_id] = {
+        'state': AddUserState.WAITING_FOR_ID,
+        'message_id': msg.message_id
+    }
+    return True
+
+def handle_add_user_id(message, bot):
+    admin_id = message.from_user.id
+    
+    if admin_id not in add_user_states:
+        return False
+    
+    bot.delete_message(message.chat.id, message.message_id)
+    
+    user_id = message.text.strip()
+    try:
+        int(user_id)
+    except ValueError:
+        bot.edit_message_text(
+            _('invalid_user_id'),
+            message.chat.id,
+            add_user_states[admin_id]['message_id'],
+            reply_markup=types.InlineKeyboardMarkup().add(
+                types.InlineKeyboardButton(_('try_again'), callback_data='add_new_user'),
+                types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user')
+            )
+        )
+        return False
+    
+    if os.getenv(f"{USER_PREFIX}{user_id}"):
+        bot.edit_message_text(
+            _('user_already_exists'),
+            message.chat.id,
+            add_user_states[admin_id]['message_id'],
+            reply_markup=types.InlineKeyboardMarkup().add(
+                types.InlineKeyboardButton(_('try_again'), callback_data='add_new_user'),
+                types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user')
+            )
+        )
+        return False
+    
+    add_user_states[admin_id]['user_id'] = user_id
+    add_user_states[admin_id]['state'] = AddUserState.WAITING_FOR_NAME
+    
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user'))
+    
+    bot.edit_message_text(
+        _('enter_user_name'),
+        message.chat.id,
+        add_user_states[admin_id]['message_id'],
+        reply_markup=markup
+    )
+    return True
+
+def handle_add_user_name(message, bot):
+    admin_id = message.from_user.id
+    
+    if admin_id not in add_user_states or add_user_states[admin_id]['state'] != AddUserState.WAITING_FOR_NAME:
+        return False
+    
+    bot.delete_message(message.chat.id, message.message_id)
+    
+    name = message.text.strip()
+    if not name:
+        bot.edit_message_text(
+            _('invalid_user_name'),
+            message.chat.id,
+            add_user_states[admin_id]['message_id'],
+            reply_markup=types.InlineKeyboardMarkup().add(
+                types.InlineKeyboardButton(_('try_again'), callback_data='add_new_user'),
+                types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user')
+            )
+        )
+        return False
+    
+    add_user_states[admin_id]['name'] = name
+    user_id = add_user_states[admin_id]['user_id']
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton(_('confirm'), callback_data=f'confirm_add_user_{user_id}_{name}'),
+        types.InlineKeyboardButton(_('cancel'), callback_data='cancel_add_user')
+    )
+    
+    bot.edit_message_text(
+        _('confirm_add_user', user_id=user_id, name=name),
+        message.chat.id,
+        add_user_states[admin_id]['message_id'],
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+    return True
+
+def confirm_add_user(call, bot):
+    admin_id = call.from_user.id
+    USER_ID = os.getenv('USER_ID')
+    
+    if str(admin_id) != USER_ID:
+        bot.answer_callback_query(call.id, _('admin_required'))
+        return False
+    
+    parts = call.data.split('_')
+    user_id = parts[3]
+    name = parts[4]
+    
+    if admin_id in add_user_states and 'name' in add_user_states[admin_id]:
+        name = add_user_states[admin_id]['name']
+    
+    try:
+        dotenv_path = find_dotenv()
+        set_key(dotenv_path, f"{USER_PREFIX}{user_id}", name)
+        
+        modules = ["balance", "notification", "task", "email", "files", "vps"]
+        for module in modules:
+            set_key(dotenv_path, f"{PERM_PREFIX}{user_id}_{module}", "0")
+        
+        load_dotenv(dotenv_path, override=True)
+        
+        if admin_id in add_user_states:
+            del add_user_states[admin_id]
+        
+        bot.edit_message_text(
+            _('user_added_success', user_id=user_id, name=name),
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown'
+        )
+        
+        time.sleep(1)
+        list_users(admin_id, bot, 0)
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error adding user: {e}")
+        bot.edit_message_text(
+            _('error_adding_user', error=str(e)),
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=types.InlineKeyboardMarkup().add(
+                types.InlineKeyboardButton(_('back_to_users'), callback_data='menu_permissions')
+            )
+        )
+        return False
+
+def cancel_add_user(call, bot):
+    admin_id = call.from_user.id
+    
+    if admin_id in add_user_states:
+        del add_user_states[admin_id]
+    
+    list_users(admin_id, bot, 0, call)
+    return True

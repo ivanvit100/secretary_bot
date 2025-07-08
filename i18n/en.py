@@ -241,6 +241,9 @@ messages = {
     "plot_zero_income_expenses": "Both income and expenses are zero. Skipping pie chart generation.",
     "plot_invalid_data": "Income and expenses should be lists",
     "plot_month_saved": "Month plot saved as month_plot.png",
+    "plot_balance_title_only": "Balance by Month",
+    "plot_saldo_title_only": "Saldo by Month",
+    "plot_separate_balance_saldo_saved": "Balance and Saldo plots saved as balance_plot.png and saldo_plot.png",
 
     # SSH and commands
     "ssh_sudo_forbidden": "Using 'sudo' command is forbidden.",
@@ -382,7 +385,19 @@ messages = {
     "telegram_username": "Username",
     "telegram_link": "Link to profile",
     "user_command_help": "Command format:\n/user add <user_id> <name> - add a user\n/user remove <user_id> - remove a user\n/user permission <user_id> <module> <true/false> - set permission\n/user list - show users list",
-    
+    "add_new_user": "➕ Add user",
+    "enter_user_id": "Enter user ID:",
+    "enter_user_name": "Enter username:",
+    "invalid_user_id": "Error in ID format. ID must be a number.",
+    "invalid_user_name": "Username can't be void.",
+    "user_already_exists": "User with similar ID is already exist.",
+    "confirm_add_user": "Add user?\n\nID: `{user_id}`\nName: {name}",
+    "user_added_success": "✅ User added!\nID: `{user_id}`\nИмя: {name}",
+    "error_adding_user": "❌ Error during user add: {error}",
+    "cancel": "Cancel",
+    "confirm": "Accept",
+    "try_again": "Try again",
+
     # Module names
     "module_balance": "Balance",
     "module_notification": "Notifications",

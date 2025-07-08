@@ -1,5 +1,5 @@
 # Secretary Bot
-
+![menu](/screenshots/menu.png)
 ## Description
 This project is a Telegram bot that acts as a personal secretary. It helps automate various tasks such as balance management, report sending, notifications, and much more. The bot is designed to simplify daily tasks and improve productivity.
 
@@ -7,6 +7,12 @@ This project is a Telegram bot that acts as a personal secretary. It helps autom
 This file on another languages:
 - [Russian](./README.md)
 - [English](./README.en.md)
+
+## Screenshots
+
+![report](/screenshots/report.png)
+![email](/screenshots/email.png)
+![permissions](/screenshots/permissions.png)
 
 ## Features
 ### Commands
@@ -36,10 +42,14 @@ This file on another languages:
 - `/ssh <command>` - Execute a command on the server.
 - `/stats` - Show Beget statistics.
 - `/language` - Change interface language.
+- `/menu` - Show menu.
+- `/user add <id> <name>` - Add user.
+- `/user permissin <id> <permission> <bool>` - Add/delete permission to use module.
 
 ### Automatic Tasks
 - Daily task check.
 - Monthly balance report sending.
+- Notification about plans.
 
 ## Installation
 1. Clone the repository:
