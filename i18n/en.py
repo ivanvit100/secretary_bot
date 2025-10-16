@@ -87,6 +87,7 @@ messages = {
     "expense_select_category": "Choose category for {value}:",
     "expense_important": "Important",
     "expense_unplanned": "Unplanned",
+    "expense_repetable": "Repetable",
     "expense_optional": "Optional", 
     "expense_uncategorized": "Uncategorized",
     "expense_category_selected": "Expense {value} added to category {category}",

@@ -87,6 +87,7 @@ messages = {
     "expense_select_category": "Выберите категорию для расхода {value}:",
     "expense_important": "Важные",
     "expense_unplanned": "Незапланированные",
+    "expense_repetable": "Повторяющиеся",
     "expense_optional": "Необязательные", 
     "expense_uncategorized": "Без категории",
     "expense_category_selected": "Расход {value} добавлен в категорию {category}",

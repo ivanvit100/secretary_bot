@@ -130,6 +130,7 @@ def plot_categories(data):
         months = list(data['year'].keys())
         important = []
         unplanned = []
+        repetable = []
         optional = []
         uncategorized = []
         
@@ -137,20 +138,23 @@ def plot_categories(data):
             if 'categories' in data['year'][month]:
                 important.append(data['year'][month]['categories'].get('important', 0))
                 unplanned.append(data['year'][month]['categories'].get('unplanned', 0))
+                repetable.append(data['year'][month]['categories'].get('repetable', 0))
                 optional.append(data['year'][month]['categories'].get('optional', 0))
                 uncategorized.append(data['year'][month]['categories'].get('uncategorized', 0))
             else:
                 important.append(0)
                 unplanned.append(0)
+                repetable.append(0)
                 optional.append(0)
                 uncategorized.append(0)
         
         plt.figure(figsize=(12, 6))
         plt.bar(months, important, label=_('expense_important'))
         plt.bar(months, unplanned, bottom=important, label=_('expense_unplanned'))
-        plt.bar(months, optional, bottom=[i+u for i, u in zip(important, unplanned)], label=_('expense_optional'))
+        plt.bar(months, repetable, bottom=[i+u for i, u in zip(important, unplanned)], label=_('expense_repetable'))
+        plt.bar(months, optional, bottom=[i+u+r for i, u, r in zip(important, unplanned, repetable)], label=_('expense_optional'))
         plt.bar(months, uncategorized, 
-                bottom=[i+u+o for i, u, o in zip(important, unplanned, optional)], 
+                bottom=[i+u+r+o for i, u, r, o in zip(important, unplanned, repetable, optional)], 
                 label=_('expense_uncategorized'))
         
         plt.xlabel(_('months'))

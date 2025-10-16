@@ -30,10 +30,11 @@ def balance_main(message: telebot.types.Message, bot: telebot.TeleBot):
             if new_balance < 0:
                 update_balance(new_balance, 'uncategorized')
                 
-                markup = types.InlineKeyboardMarkup(row_width=2)
+                markup = types.InlineKeyboardMarkup(row_width=3)
                 markup.add(
                     types.InlineKeyboardButton(_("expense_important"), callback_data=f"expense_cat_important_{abs(new_balance)}"),
-                    types.InlineKeyboardButton(_("expense_unplanned"), callback_data=f"expense_cat_unplanned_{abs(new_balance)}")
+                    types.InlineKeyboardButton(_("expense_unplanned"), callback_data=f"expense_cat_unplanned_{abs(new_balance)}"),
+                    types.InlineKeyboardButton(_("expense_repetable"), callback_data=f"expense_cat_repetable_{abs(new_balance)}")
                 )
                 markup.add(
                     types.InlineKeyboardButton(_("expense_optional"), callback_data=f"expense_cat_optional_{abs(new_balance)}"),
@@ -96,6 +97,7 @@ def update_balance(new_balance: float, category: str = None):
                     data['categories'] = {
                         'important': 0,
                         'unplanned': 0,
+                        'repetable': 0,
                         'optional': 0,
                         'uncategorized': 0
                     }
@@ -104,6 +106,7 @@ def update_balance(new_balance: float, category: str = None):
                     data['year'][month]['categories'] = {
                         'important': 0,
                         'unplanned': 0,
+                        'repetable': 0,
                         'optional': 0,
                         'uncategorized': 0
                     }
