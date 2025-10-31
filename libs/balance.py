@@ -101,7 +101,7 @@ def update_balance(new_balance: float, category: str = None):
                         'optional': 0,
                         'uncategorized': 0
                     }
-                
+
                 if 'categories' not in data['year'][month]:
                     data['year'][month]['categories'] = {
                         'important': 0,
@@ -110,7 +110,12 @@ def update_balance(new_balance: float, category: str = None):
                         'optional': 0,
                         'uncategorized': 0
                     }
-                
+
+                if category not in data['categories']:
+                    data['categories'][category] = 0
+                if category not in data['year'][month]['categories']:
+                    data['year'][month]['categories'][category] = 0
+
                 data['categories'][category] += expense
                 data['year'][month]['categories'][category] += expense
 
@@ -359,26 +364,27 @@ def init_categories():
             data['categories'] = {
                 'important': 0,
                 'unplanned': 0,
+                'repetable': 0,
                 'optional': 0,
                 'uncategorized': 0
             }
-            
+
             with open(balance_file_path, 'w') as file:
                 json.dump(data, file, indent=4, ensure_ascii=False)
             logging.info("Expense categories initialized")
-        
+
         for month in data['year']:
             if 'categories' not in data['year'][month]:
                 data['year'][month]['categories'] = {
                     'important': 0,
                     'unplanned': 0,
+                    'repetable': 0,
                     'optional': 0,
                     'uncategorized': 0
                 }
-        
+
         with open(balance_file_path, 'w') as file:
             json.dump(data, file, indent=4, ensure_ascii=False)
-            
     except Exception as e:
         logging.error(f"Error initializing expense categories: {e}")
 
@@ -386,23 +392,30 @@ def handle_expense_category(call: telebot.types.CallbackQuery, bot: telebot.Tele
     try:
         parts = call.data.split('_')
         category = parts[2]
+        if category == 'repetable':
+            category = 'repetable'
         amount = float(parts[3])
         
         if category != 'uncategorized':
             with open(balance_file_path, 'r') as file:
                 data = json.load(file)
-                
+
             month = datetime.datetime.now().strftime('%B')
-            
-            if 'categories' in data and 'categories' in data['year'][month]:
-                data['categories']['uncategorized'] -= amount
-                data['year'][month]['categories']['uncategorized'] -= amount
-                
-                data['categories'][category] += amount
-                data['year'][month]['categories'][category] += amount
-                
-                with open(balance_file_path, 'w') as file:
-                    json.dump(data, file, indent=4, ensure_ascii=False)
+
+            for cat in ['uncategorized', category]:
+                if cat not in data['categories']:
+                    data['categories'][cat] = 0
+                if cat not in data['year'][month]['categories']:
+                    data['year'][month]['categories'][cat] = 0
+
+            data['categories']['uncategorized'] -= amount
+            data['year'][month]['categories']['uncategorized'] -= amount
+
+            data['categories'][category] += amount
+            data['year'][month]['categories'][category] += amount
+
+            with open(balance_file_path, 'w') as file:
+                json.dump(data, file, indent=4, ensure_ascii=False)
         
         category_name = _(f"expense_{category}")
         bot.edit_message_text(
